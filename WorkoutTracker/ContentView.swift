@@ -13,6 +13,23 @@ struct ContentView: View {
     @Query private var exercises: [Exercise]
 
     var body: some View {
+        TabView {
+            WorkoutListView()
+                .tabItem { Label("Workouts", systemImage: "list.bullet.clipboard") }
+
+            ExerciseListView(exercises: exercises)
+                .tabItem { Label("Exercises", systemImage: "dumbbell") }
+        }
+        .onAppear {
+            ExerciseSeeder.seedIfNeeded(context: modelContext)
+        }
+    }
+}
+
+private struct ExerciseListView: View {
+    let exercises: [Exercise]
+
+    var body: some View {
         NavigationStack {
             List(exercises) { exercise in
                 HStack {
@@ -26,9 +43,6 @@ struct ContentView: View {
                 }
             }
             .navigationTitle("Exercises")
-            .onAppear {
-                ExerciseSeeder.seedIfNeeded(context: modelContext)
-            }
         }
     }
 }
