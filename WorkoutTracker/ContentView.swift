@@ -26,6 +26,8 @@ struct ContentView: View {
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gear") }
         }
+        .tint(AppTheme.accent)
+        .preferredColorScheme(.dark)
         .onAppear {
             ExerciseSeeder.seedIfNeeded(context: modelContext)
         }
@@ -41,17 +43,24 @@ private struct ExerciseListView: View {
                 NavigationLink {
                     ExerciseDetailView(exercise: exercise)
                 } label: {
-                    HStack {
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(PlateColor.forExercise(exercise.name))
+                            .frame(width: 10, height: 10)
                         Text(exercise.name)
+                            .foregroundStyle(AppTheme.textPrimary)
                         Spacer()
                         if exercise.isMainLift {
                             Text("PR tracked")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppTheme.textSecondary)
                         }
                     }
                 }
+                .listRowBackground(AppTheme.surface)
             }
+            .scrollContentBackground(.hidden)
+            .background(AppTheme.background)
             .navigationTitle("Exercises")
         }
     }

@@ -16,6 +16,11 @@ struct WorkoutListView: View {
 
     @State private var activeWorkout: Workout?
     @State private var workoutPendingDelete: Workout?
+    
+    private func mainLiftsIn(_ workout: Workout) -> [String] {
+        let names = workout.exercises.compactMap { $0.exercise?.name }
+        return names.filter { ["Deadlift", "Bench Press", "Squat"].contains($0) }
+    }
 
     var body: some View {
         NavigationStack {
@@ -32,15 +37,25 @@ struct WorkoutListView: View {
                             NavigationLink {
                                 WorkoutDetailView(workout: workout)
                             } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(workout.name ?? workout.date.formatted(date: .abbreviated, time: .omitted))
-                                        .font(.headline)
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack(spacing: 6) {
+                                        ForEach(mainLiftsIn(workout), id: \.self) { name in
+                                            Circle()
+                                                .fill(PlateColor.forExercise(name))
+                                                .frame(width: 8, height: 8)
+                                        }
+                                        Text(workout.name ?? workout.date.formatted(date: .abbreviated, time: .omitted))
+                                            .font(.headline)
+                                            .foregroundStyle(AppTheme.textPrimary)
+                                    }
                                     let vol = weightUnit.fromKg(workout.totalVolume)
                                     Text("\(workout.totalWorkingSets) sets · \(workout.totalReps) reps · \(Int(vol)) \(weightUnit.label) volume")
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(AppTheme.textSecondary)
                                 }
+                                .padding(.vertical, 4)
                             }
+                            .listRowBackground(AppTheme.surface)
                             .swipeActions {
                                 Button("Delete", role: .destructive) {
                                     workoutPendingDelete = workout
@@ -48,6 +63,8 @@ struct WorkoutListView: View {
                             }
                         }
                     }
+                    .scrollContentBackground(.hidden)
+                    .background(AppTheme.background)
                 }
             }
             .navigationTitle("Workouts")

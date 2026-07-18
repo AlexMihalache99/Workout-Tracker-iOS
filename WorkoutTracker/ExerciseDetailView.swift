@@ -63,5 +63,8 @@ struct ExerciseDetailView: View {
         }
         .navigationTitle(exercise.name)
         .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.background)
+        .listRowBackground(AppTheme.surface)
     }
 }

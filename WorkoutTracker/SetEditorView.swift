@@ -107,7 +107,12 @@ struct SetEditorView: View {
                     Button("Done") { focusedField = nil }
                 }
             }
-            .onAppear { prefillIfEditing() }
+            .onAppear {
+                prefillIfEditing()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    focusedField = nil
+                }
+            }
         }
     }
 
@@ -125,8 +130,8 @@ struct SetEditorView: View {
     }
 
     private func save() {
-        guard let enteredWeight = weightValue, let reps = repsValue, isValid else { return }
-        let weightInKg = weightUnit.toKg(enteredWeight)
+        guard let weight = weightValue, let reps = repsValue, isValid else { return }
+        let weightInKg = weightUnit.toKg(weight)
 
         if let existing = editingSet {
             existing.weight = weightInKg
@@ -146,6 +151,7 @@ struct SetEditorView: View {
             onSave(entry)
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        focusedField = nil
         dismiss()
     }
 }

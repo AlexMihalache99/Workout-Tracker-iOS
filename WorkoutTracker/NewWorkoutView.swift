@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 import SwiftData
 
 struct NewWorkoutView: View {
@@ -17,6 +18,7 @@ struct NewWorkoutView: View {
     @State private var showingExercisePicker = false
     @State private var setEditorTarget: SetEditorTarget?
     @State private var showingDiscardConfirmation = false
+    @FocusState private var nameFieldFocused: Bool
 
     private struct SetEditorTarget: Identifiable {
         let id = UUID()
@@ -32,6 +34,7 @@ struct NewWorkoutView: View {
                         get: { workout.name ?? "" },
                         set: { workout.name = $0.isEmpty ? nil : $0 }
                     ))
+                    .focused($nameFieldFocused)
                     DatePicker("Date", selection: $workout.date, displayedComponents: [.date, .hourAndMinute])
                 }
 
@@ -85,7 +88,10 @@ struct NewWorkoutView: View {
                     workout.exercises.append(entry)
                 }
             }
-            .sheet(item: $setEditorTarget) { target in
+            .sheet(item: $setEditorTarget, onDismiss: {
+                nameFieldFocused = false
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }) { target in
                 let nextNumber = target.entry.sets.filter { $0.setType == target.type }.count + 1
                 SetEditorView(setType: target.type, nextSetNumber: nextNumber) { newSet in
                     newSet.exerciseEntry = target.entry
@@ -100,6 +106,11 @@ struct NewWorkoutView: View {
                 Button("Keep Editing", role: .cancel) {}
             } message: {
                 Text("You'll lose everything logged in this workout.")
+            }
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    nameFieldFocused = false
+                }
             }
         }
     }

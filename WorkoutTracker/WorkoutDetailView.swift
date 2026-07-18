@@ -46,9 +46,11 @@ struct WorkoutDetailView: View {
                         } label: {
                             HStack {
                                 Text(set.setType == .warmup ? "W" : "\(set.setNumber)")
-                                    .font(.caption.bold())
-                                    .foregroundStyle(set.setType == .warmup ? .orange : .primary)
-                                    .frame(width: 24)
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 22, height: 22)
+                                    .background(set.setType == .warmup ? PlateColor.warmup : PlateColor.forExercise(entry.exercise?.name ?? ""))
+                                    .clipShape(Circle())
                                 Text("\(weightUnit.fromKg(set.weight), specifier: "%.1f") \(weightUnit.label) × \(set.reps)")
                                 Spacer()
                                 if let rpe = set.rpe {
@@ -84,6 +86,8 @@ struct WorkoutDetailView: View {
         .sheet(item: $setEditorTarget) { target in
             SetEditorView(setType: target.set.setType, nextSetNumber: target.set.setNumber, editingSet: target.set) { _ in }
         }
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.background)
     }
 
     private func deleteSets(from entry: ExerciseEntry, at offsets: IndexSet) {

@@ -39,6 +39,9 @@ struct ExercisePickerView: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(AppTheme.background)
+            .listRowBackground(AppTheme.surface)
         }
     }
 }
