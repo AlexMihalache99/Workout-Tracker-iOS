@@ -17,6 +17,9 @@ struct ContentView: View {
             WorkoutListView()
                 .tabItem { Label("Workouts", systemImage: "list.bullet.clipboard") }
 
+            PRDashboardView()
+                .tabItem { Label("PRs", systemImage: "chart.line.uptrend.xyaxis") }
+
             ExerciseListView(exercises: exercises)
                 .tabItem { Label("Exercises", systemImage: "dumbbell") }
         }
