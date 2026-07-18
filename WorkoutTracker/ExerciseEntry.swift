@@ -11,6 +11,7 @@ import SwiftData
 @Model
 final class ExerciseEntry {
     var exercise: Exercise?
+    var workout: Workout?
 
     @Relationship(deleteRule: .cascade)
     var sets: [SetEntry] = []
@@ -30,5 +31,11 @@ final class ExerciseEntry {
 
     var totalVolume: Double {
         workingSets.reduce(0) { $0 + ($1.weight * Double($1.reps)) }
+    }
+    
+    var averageRPE: Double? {
+            let rpes = workingSets.compactMap { $0.rpe }
+            guard !rpes.isEmpty else { return nil }
+            return rpes.reduce(0, +) / Double(rpes.count)
     }
 }

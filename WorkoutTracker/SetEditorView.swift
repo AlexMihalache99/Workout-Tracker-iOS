@@ -10,6 +10,7 @@ import SwiftUI
 struct SetEditorView: View {
     let setType: SetType
     let nextSetNumber: Int
+    var editingSet: SetEntry? = nil        // nil = adding new, non-nil = editing
     var onSave: (SetEntry) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -72,24 +73,48 @@ struct SetEditorView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") { save() }
+                    Button(editingSet == nil ? "Add" : "Save") { save() }
                         .disabled(weightText.isEmpty || repsText.isEmpty)
                 }
             }
+            .onAppear { prefillIfEditing() }
+        }
+    }
+
+    private func prefillIfEditing() {
+        guard let set = editingSet else { return }
+        weightText = String(set.weight)
+        repsText = String(set.reps)
+        if let rpe = set.rpe {
+            trackingMode = .rpe
+            rpeValue = rpe
+        } else if let rir = set.rir {
+            trackingMode = .rir
+            rirValue = rir
         }
     }
 
     private func save() {
         guard let weight = Double(weightText), let reps = Int(repsText) else { return }
-        let entry = SetEntry(
-            setType: setType,
-            setNumber: nextSetNumber,
-            weight: weight,
-            reps: reps,
-            rpe: trackingMode == .rpe ? rpeValue : nil,
-            rir: trackingMode == .rir ? rirValue : nil
-        )
-        onSave(entry)
+
+        if let existing = editingSet {
+            // Mutate in place — SwiftData autosaves the change
+            existing.weight = weight
+            existing.reps = reps
+            existing.rpe = trackingMode == .rpe ? rpeValue : nil
+            existing.rir = trackingMode == .rir ? rirValue : nil
+            onSave(existing)
+        } else {
+            let entry = SetEntry(
+                setType: setType,
+                setNumber: nextSetNumber,
+                weight: weight,
+                reps: reps,
+                rpe: trackingMode == .rpe ? rpeValue : nil,
+                rir: trackingMode == .rir ? rirValue : nil
+            )
+            onSave(entry)
+        }
         dismiss()
     }
 }

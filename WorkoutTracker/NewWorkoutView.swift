@@ -84,12 +84,14 @@ struct NewWorkoutView: View {
             .sheet(isPresented: $showingExercisePicker) {
                 ExercisePickerView { exercise in
                     let entry = ExerciseEntry(exercise: exercise)
+                    entry.workout = workout
                     workout.exercises.append(entry)
                 }
             }
             .sheet(item: $setEditorTarget) { target in
                 let nextNumber = target.entry.sets.filter { $0.setType == target.type }.count + 1
                 SetEditorView(setType: target.type, nextSetNumber: nextNumber) { newSet in
+                    newSet.exerciseEntry = target.entry
                     target.entry.sets.append(newSet)
                 }
             }

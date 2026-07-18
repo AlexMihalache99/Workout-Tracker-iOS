@@ -32,13 +32,17 @@ private struct ExerciseListView: View {
     var body: some View {
         NavigationStack {
             List(exercises) { exercise in
-                HStack {
-                    Text(exercise.name)
-                    Spacer()
-                    if exercise.isMainLift {
-                        Text("PR tracked")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                NavigationLink {
+                    ExerciseDetailView(exercise: exercise)
+                } label: {
+                    HStack {
+                        Text(exercise.name)
+                        Spacer()
+                        if exercise.isMainLift {
+                            Text("PR tracked")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

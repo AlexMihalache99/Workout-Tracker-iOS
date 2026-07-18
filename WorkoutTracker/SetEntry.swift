@@ -21,6 +21,7 @@ final class SetEntry {
     var reps: Int
     var rpe: Double?   // optional, 0.5–10
     var rir: Int?       // optional, 0–5 (use RPE or RIR, not both)
+    var exerciseEntry: ExerciseEntry?
 
     init(setType: SetType, setNumber: Int, weight: Double, reps: Int, rpe: Double? = nil, rir: Int? = nil) {
         self.setType = setType
