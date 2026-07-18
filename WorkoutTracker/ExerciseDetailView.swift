@@ -13,6 +13,8 @@ struct ExerciseDetailView: View {
 
     // Pull every ExerciseEntry for this exercise, across all workouts
     @Query private var allEntries: [ExerciseEntry]
+    @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
 
     init(exercise: Exercise) {
         self.exercise = exercise
@@ -38,7 +40,7 @@ struct ExerciseDetailView: View {
         List {
             if exercise.isMainLift, let pr = personalRecord {
                 Section("Personal Record") {
-                    Text("\(pr, specifier: "%.1f") kg")
+                    Text("\(weightUnit.fromKg(pr), specifier: "%.1f") \(weightUnit.label)")
                         .font(.title2.bold())
                 }
             }
@@ -49,7 +51,7 @@ struct ExerciseDetailView: View {
                         HStack {
                             Text(set.setType == .warmup ? "Warm-up" : "Set \(set.setNumber)")
                             Spacer()
-                            Text("\(set.weight, specifier: "%.1f") kg × \(set.reps)")
+                            Text("\(weightUnit.fromKg(set.weight), specifier: "%.1f") \(weightUnit.label) × \(set.reps)")
                         }
                     }
                 }

@@ -13,6 +13,8 @@ struct WorkoutDetailView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var setEditorTarget: SetEditorTarget?
+    @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
 
     private struct SetEditorTarget: Identifiable {
         let id = UUID()
@@ -26,7 +28,7 @@ struct WorkoutDetailView: View {
                 LabeledContent("Date", value: workout.date.formatted(date: .abbreviated, time: .shortened))
                 LabeledContent("Total Working Sets", value: "\(workout.totalWorkingSets)")
                 LabeledContent("Total Reps", value: "\(workout.totalReps)")
-                LabeledContent("Total Volume", value: "\(Int(workout.totalVolume)) kg")
+                LabeledContent("Total Volume", value: "\(Int(weightUnit.fromKg(workout.totalVolume))) \(weightUnit.label)")
             }
 
             Section("Notes") {
@@ -47,7 +49,7 @@ struct WorkoutDetailView: View {
                                     .font(.caption.bold())
                                     .foregroundStyle(set.setType == .warmup ? .orange : .primary)
                                     .frame(width: 24)
-                                Text("\(set.weight, specifier: "%.1f") kg × \(set.reps)")
+                                Text("\(weightUnit.fromKg(set.weight), specifier: "%.1f") \(weightUnit.label) × \(set.reps)")
                                 Spacer()
                                 if let rpe = set.rpe {
                                     Text("RPE \(rpe, specifier: "%.1f")")
@@ -73,7 +75,7 @@ struct WorkoutDetailView: View {
                         }
                     }
                 } footer: {
-                    Text("\(entry.workingSets.count) working sets · \(entry.totalReps) reps · \(Int(entry.totalVolume)) kg volume")
+                    Text("\(entry.workingSets.count) working sets · \(entry.totalReps) reps · \(Int(weightUnit.fromKg(entry.totalVolume))) \(weightUnit.label) volume")
                 }
             }
         }

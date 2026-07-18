@@ -22,6 +22,9 @@ struct ContentView: View {
 
             ExerciseListView(exercises: exercises)
                 .tabItem { Label("Exercises", systemImage: "dumbbell") }
+
+            SettingsView()
+                .tabItem { Label("Settings", systemImage: "gear") }
         }
         .onAppear {
             ExerciseSeeder.seedIfNeeded(context: modelContext)

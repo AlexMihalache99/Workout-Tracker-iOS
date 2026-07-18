@@ -12,6 +12,8 @@ import Charts
 struct PRDashboardView: View {
     @Query(filter: #Predicate<Exercise> { $0.isMainLift == true })
     private var mainLifts: [Exercise]
+    @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
 
     var body: some View {
         NavigationStack {
@@ -35,6 +37,8 @@ private struct LiftProgressCard: View {
     let exercise: Exercise
 
     @Query private var allEntries: [ExerciseEntry]
+    @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
 
     init(exercise: Exercise) {
         self.exercise = exercise
@@ -77,7 +81,7 @@ private struct LiftProgressCard: View {
                     Text(exercise.name)
                         .font(.headline)
                     if let pr = personalRecord {
-                        Text("\(pr, specifier: "%.1f") kg")
+                        Text("\(weightUnit.fromKg(pr), specifier: "%.1f") \(weightUnit.label)")
                             .font(.system(size: 28, weight: .bold))
                     } else {
                         Text("No data yet")
@@ -98,13 +102,13 @@ private struct LiftProgressCard: View {
                 Chart(dataPoints) { point in
                     LineMark(
                         x: .value("Date", point.date),
-                        y: .value("Weight", point.maxWeight)
+                        y: .value("Weight", weightUnit.fromKg(point.maxWeight))
                     )
                     .interpolationMethod(.monotone)
 
                     PointMark(
                         x: .value("Date", point.date),
-                        y: .value("Weight", point.maxWeight)
+                        y: .value("Weight", weightUnit.fromKg(point.maxWeight))
                     )
                 }
                 .frame(height: 140)

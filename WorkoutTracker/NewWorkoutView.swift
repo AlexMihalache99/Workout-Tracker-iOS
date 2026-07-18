@@ -16,6 +16,7 @@ struct NewWorkoutView: View {
 
     @State private var showingExercisePicker = false
     @State private var setEditorTarget: SetEditorTarget?
+    @State private var showingDiscardConfirmation = false
 
     private struct SetEditorTarget: Identifiable {
         let id = UUID()
@@ -31,6 +32,7 @@ struct NewWorkoutView: View {
                         get: { workout.name ?? "" },
                         set: { workout.name = $0.isEmpty ? nil : $0 }
                     ))
+                    DatePicker("Date", selection: $workout.date, displayedComponents: [.date, .hourAndMinute])
                 }
 
                 ForEach(workout.exercises) { entry in
@@ -67,15 +69,10 @@ struct NewWorkoutView: View {
             .navigationTitle("New Workout")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Discard") {
-                        modelContext.delete(workout)
-                        dismiss()
-                    }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         try? modelContext.save()
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
                         dismiss()
                     }
                     .disabled(workout.exercises.isEmpty)
@@ -94,6 +91,15 @@ struct NewWorkoutView: View {
                     newSet.exerciseEntry = target.entry
                     target.entry.sets.append(newSet)
                 }
+            }
+            .confirmationDialog("Discard this workout?", isPresented: $showingDiscardConfirmation, titleVisibility: .visible) {
+                Button("Discard", role: .destructive) {
+                    modelContext.delete(workout)
+                    dismiss()
+                }
+                Button("Keep Editing", role: .cancel) {}
+            } message: {
+                Text("You'll lose everything logged in this workout.")
             }
         }
     }

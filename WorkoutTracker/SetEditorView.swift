@@ -10,21 +10,40 @@ import SwiftUI
 struct SetEditorView: View {
     let setType: SetType
     let nextSetNumber: Int
-    var editingSet: SetEntry? = nil        // nil = adding new, non-nil = editing
+    var editingSet: SetEntry? = nil
     var onSave: (SetEntry) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
 
     @State private var weightText: String = ""
     @State private var repsText: String = ""
     @State private var trackingMode: TrackingMode = .none
     @State private var rpeValue: Double = 8.0
     @State private var rirValue: Int = 2
+    @FocusState private var focusedField: Field?
 
+    private enum Field { case weight, reps }
     enum TrackingMode: String, CaseIterable {
         case none = "None"
         case rpe = "RPE"
         case rir = "RIR"
+    }
+
+    private var weightValue: Double? { Double(weightText) }
+    private var repsValue: Int? { Int(repsText) }
+
+    private var isValid: Bool {
+        guard let w = weightValue, let r = repsValue else { return false }
+        return w > 0 && r >= 1
+    }
+
+    private var validationMessage: String? {
+        if weightText.isEmpty || repsText.isEmpty { return nil } // don't nag before they've typed anything
+        if weightValue == nil || (weightValue ?? 0) <= 0 { return "Weight must be greater than 0" }
+        if repsValue == nil || (repsValue ?? 0) < 1 { return "Reps must be at least 1" }
+        return nil
     }
 
     var body: some View {
@@ -32,11 +51,12 @@ struct SetEditorView: View {
             Form {
                 Section("Set Details") {
                     HStack {
-                        Text("Weight (kg)")
+                        Text("Weight (\(weightUnit.label))")
                         Spacer()
                         TextField("0", text: $weightText)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
+                            .focused($focusedField, equals: .weight)
                     }
                     HStack {
                         Text("Reps")
@@ -44,6 +64,12 @@ struct SetEditorView: View {
                         TextField("0", text: $repsText)
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
+                            .focused($focusedField, equals: .reps)
+                    }
+                    if let message = validationMessage {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.red)
                     }
                 }
 
@@ -74,7 +100,11 @@ struct SetEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(editingSet == nil ? "Add" : "Save") { save() }
-                        .disabled(weightText.isEmpty || repsText.isEmpty)
+                        .disabled(!isValid)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
                 }
             }
             .onAppear { prefillIfEditing() }
@@ -83,7 +113,7 @@ struct SetEditorView: View {
 
     private func prefillIfEditing() {
         guard let set = editingSet else { return }
-        weightText = String(set.weight)
+        weightText = String(format: "%.1f", weightUnit.fromKg(set.weight))
         repsText = String(set.reps)
         if let rpe = set.rpe {
             trackingMode = .rpe
@@ -95,11 +125,11 @@ struct SetEditorView: View {
     }
 
     private func save() {
-        guard let weight = Double(weightText), let reps = Int(repsText) else { return }
+        guard let enteredWeight = weightValue, let reps = repsValue, isValid else { return }
+        let weightInKg = weightUnit.toKg(enteredWeight)
 
         if let existing = editingSet {
-            // Mutate in place — SwiftData autosaves the change
-            existing.weight = weight
+            existing.weight = weightInKg
             existing.reps = reps
             existing.rpe = trackingMode == .rpe ? rpeValue : nil
             existing.rir = trackingMode == .rir ? rirValue : nil
@@ -108,13 +138,14 @@ struct SetEditorView: View {
             let entry = SetEntry(
                 setType: setType,
                 setNumber: nextSetNumber,
-                weight: weight,
+                weight: weightInKg,
                 reps: reps,
                 rpe: trackingMode == .rpe ? rpeValue : nil,
                 rir: trackingMode == .rir ? rirValue : nil
             )
             onSave(entry)
         }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismiss()
     }
 }
