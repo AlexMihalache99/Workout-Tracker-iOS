@@ -17,7 +17,7 @@ struct SetEditorView: View {
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
     private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
 
-    @State private var weightText: String = ""
+    @State private var weightText: String = "0"
     @State private var repsText: String = ""
     @State private var trackingMode: TrackingMode = .none
     @State private var rpeValue: Double = 8.0
@@ -36,12 +36,12 @@ struct SetEditorView: View {
 
     private var isValid: Bool {
         guard let w = weightValue, let r = repsValue else { return false }
-        return w > 0 && r >= 1
+        return w >= 0 && r >= 1
     }
 
     private var validationMessage: String? {
-        if weightText.isEmpty || repsText.isEmpty { return nil } // don't nag before they've typed anything
-        if weightValue == nil || (weightValue ?? 0) <= 0 { return "Weight must be greater than 0" }
+        if weightText.isEmpty || repsText.isEmpty { return nil }
+        if weightValue == nil || (weightValue ?? -1) < 0 { return "Weight can't be negative" }
         if repsValue == nil || (repsValue ?? 0) < 1 { return "Reps must be at least 1" }
         return nil
     }
