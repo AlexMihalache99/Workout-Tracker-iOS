@@ -13,14 +13,26 @@ struct ExercisePickerView: View {
     @Environment(\.dismiss) private var dismiss
     var onPick: (Exercise) -> Void
 
+    @State private var searchText = ""
+
+    private var filteredExercises: [Exercise] {
+        if searchText.isEmpty {
+            return exercises
+        }
+        return exercises.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+
     var body: some View {
         NavigationStack {
-            List(exercises) { exercise in
+            List(filteredExercises) { exercise in
                 Button {
                     onPick(exercise)
                     dismiss()
                 } label: {
-                    HStack {
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(PlateColor.forExercise(exercise.name))
+                            .frame(width: 10, height: 10)
                         Text(exercise.name)
                         Spacer()
                         if exercise.isMainLift {
@@ -30,8 +42,12 @@ struct ExercisePickerView: View {
                         }
                     }
                 }
-                .foregroundStyle(.primary)
+                .foregroundStyle(AppTheme.textPrimary)
+                .listRowBackground(AppTheme.surface)
             }
+            .scrollContentBackground(.hidden)
+            .background(AppTheme.background)
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search exercises")
             .navigationTitle("Select Exercise")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -39,9 +55,11 @@ struct ExercisePickerView: View {
                     Button("Cancel") { dismiss() }
                 }
             }
-            .scrollContentBackground(.hidden)
-            .background(AppTheme.background)
-            .listRowBackground(AppTheme.surface)
+            .overlay {
+                if filteredExercises.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                }
+            }
         }
     }
 }
