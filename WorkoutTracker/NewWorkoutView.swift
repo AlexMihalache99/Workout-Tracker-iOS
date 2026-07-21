@@ -40,7 +40,7 @@ struct NewWorkoutView: View {
 
                 ForEach(workout.exercises) { entry in
                     Section(entry.exercise?.name ?? "Unknown Exercise") {
-                        ForEach(entry.sets.sorted(by: { $0.setNumber < $1.setNumber })) { set in
+                        ForEach(entry.sortedSets) { set in
                             SetRow(set: set)
                         }
 

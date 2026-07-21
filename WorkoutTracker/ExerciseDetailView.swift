@@ -47,7 +47,7 @@ struct ExerciseDetailView: View {
 
             ForEach(sortedEntries) { entry in
                 Section(entry.workout?.date.formatted(date: .abbreviated, time: .omitted) ?? "Unknown date") {
-                    ForEach(entry.sets.sorted(by: { $0.setNumber < $1.setNumber })) { set in
+                    ForEach(entry.sortedSets) { set in
                         HStack {
                             Text(set.setType == .warmup ? "Warm-up" : "Set \(set.setNumber)")
                             Spacer()

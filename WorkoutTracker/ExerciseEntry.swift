@@ -38,4 +38,13 @@ final class ExerciseEntry {
             guard !rpes.isEmpty else { return nil }
             return rpes.reduce(0, +) / Double(rpes.count)
     }
+    
+    var sortedSets: [SetEntry] {
+        sets.sorted { lhs, rhs in
+            if lhs.setType != rhs.setType {
+                return lhs.setType == .warmup
+            }
+            return lhs.setNumber < rhs.setNumber
+        }
+    }
 }

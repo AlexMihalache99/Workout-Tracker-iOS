@@ -40,7 +40,7 @@ struct WorkoutDetailView: View {
 
             ForEach(workout.exercises) { entry in
                 Section {
-                    ForEach(entry.sets.sorted(by: { $0.setNumber < $1.setNumber })) { set in
+                    ForEach(entry.sortedSets) { set in
                         Button {
                             setEditorTarget = SetEditorTarget(entry: entry, set: set)
                         } label: {
@@ -91,7 +91,7 @@ struct WorkoutDetailView: View {
     }
 
     private func deleteSets(from entry: ExerciseEntry, at offsets: IndexSet) {
-        let sorted = entry.sets.sorted(by: { $0.setNumber < $1.setNumber })
+        let sorted = entry.sortedSets
         for index in offsets {
             let setToDelete = sorted[index]
             modelContext.delete(setToDelete)
