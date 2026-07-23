@@ -71,9 +71,7 @@ struct WorkoutListView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        let workout = Workout()
-                        modelContext.insert(workout)
-                        activeWorkout = workout
+                        activeWorkout = Workout()
                     } label: {
                         Image(systemName: "plus")
                     }

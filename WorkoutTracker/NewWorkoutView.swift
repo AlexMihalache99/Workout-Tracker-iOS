@@ -72,8 +72,19 @@ struct NewWorkoutView: View {
             .navigationTitle("New Workout")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Discard") {
+                        if workout.exercises.isEmpty {
+                            dismiss()
+                        } else {
+                            showingDiscardConfirmation = true
+                        }
+                    }
+                }
+                
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        modelContext.insert(workout)
                         try? modelContext.save()
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
                         dismiss()
@@ -100,7 +111,6 @@ struct NewWorkoutView: View {
             }
             .confirmationDialog("Discard this workout?", isPresented: $showingDiscardConfirmation, titleVisibility: .visible) {
                 Button("Discard", role: .destructive) {
-                    modelContext.delete(workout)
                     dismiss()
                 }
                 Button("Keep Editing", role: .cancel) {}
@@ -116,9 +126,6 @@ struct NewWorkoutView: View {
     }
 
     private func deleteExercises(at offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(workout.exercises[index])
-        }
         workout.exercises.remove(atOffsets: offsets)
     }
 }
