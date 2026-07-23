@@ -24,6 +24,13 @@ struct WorkoutDetailView: View {
 
     var body: some View {
         List {
+            Section("Name") {
+                TextField("Workout name", text: Binding(
+                    get: { workout.name ?? "" },
+                    set: { workout.name = $0.isEmpty ? nil : $0 }
+                ))
+            }
+            
             Section("Summary") {
                 LabeledContent("Date", value: workout.date.formatted(date: .abbreviated, time: .shortened))
                 LabeledContent("Total Working Sets", value: "\(workout.totalWorkingSets)")
