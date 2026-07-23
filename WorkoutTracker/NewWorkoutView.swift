@@ -115,6 +115,9 @@ struct NewWorkoutView: View {
                         title: "Discard Workout?",
                         message: "You'll lose everything logged in this workout.",
                         onDelete: {
+                            if workout.modelContext != nil {
+                                modelContext.delete(workout)
+                            }
                             showingDiscardConfirmation = false
                             dismiss()
                         },
@@ -133,6 +136,12 @@ struct NewWorkoutView: View {
     }
 
     private func deleteExercises(at offsets: IndexSet) {
+        for index in offsets {
+            let entry = workout.exercises[index]
+            if entry.modelContext != nil {
+                modelContext.delete(entry)
+            }
+        }
         workout.exercises.remove(atOffsets: offsets)
     }
 }
