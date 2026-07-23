@@ -58,7 +58,7 @@ struct WorkoutListView: View {
                             .listRowBackground(AppTheme.surface)
                             .swipeActions {
                                 Button("Delete", role: .destructive) {
-                                    workoutPendingDelete = workout
+                                    withAnimation { workoutPendingDelete = workout }
                                 }
                             }
                         }
@@ -80,19 +80,20 @@ struct WorkoutListView: View {
             .sheet(item: $activeWorkout) { workout in
                 NewWorkoutView(workout: workout)
             }
-            .confirmationDialog("Delete this workout?", isPresented: Binding(
-                get: { workoutPendingDelete != nil },
-                set: { if !$0 { workoutPendingDelete = nil } }
-            ), titleVisibility: .visible) {
-                Button("Delete", role: .destructive) {
-                    if let workout = workoutPendingDelete {
-                        modelContext.delete(workout)
-                    }
-                    workoutPendingDelete = nil
+            .overlay {
+                if let workout = workoutPendingDelete {
+                    DeleteConfirmationOverlay(
+                        title: "Delete Workout?",
+                        message: "This can't be undone.",
+                        onDelete: {
+                            modelContext.delete(workout)
+                            withAnimation { workoutPendingDelete = nil }
+                        },
+                        onCancel: {
+                            withAnimation { workoutPendingDelete = nil }
+                        }
+                    )
                 }
-                Button("Cancel", role: .cancel) { workoutPendingDelete = nil }
-            } message: {
-                Text("This can't be undone.")
             }
         }
     }

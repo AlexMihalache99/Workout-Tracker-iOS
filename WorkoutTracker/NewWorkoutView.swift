@@ -109,13 +109,20 @@ struct NewWorkoutView: View {
                     target.entry.sets.append(newSet)
                 }
             }
-            .confirmationDialog("Discard this workout?", isPresented: $showingDiscardConfirmation, titleVisibility: .visible) {
-                Button("Discard", role: .destructive) {
-                    dismiss()
+            .overlay {
+                if showingDiscardConfirmation {
+                    DeleteConfirmationOverlay(
+                        title: "Discard Workout?",
+                        message: "You'll lose everything logged in this workout.",
+                        onDelete: {
+                            showingDiscardConfirmation = false
+                            dismiss()
+                        },
+                        onCancel: {
+                            showingDiscardConfirmation = false
+                        }
+                    )
                 }
-                Button("Keep Editing", role: .cancel) {}
-            } message: {
-                Text("You'll lose everything logged in this workout.")
             }
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
