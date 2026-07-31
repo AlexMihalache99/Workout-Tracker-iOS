@@ -39,9 +39,12 @@ struct NewWorkoutView: View {
                 }
 
                 ForEach(workout.exercises) { entry in
-                    Section(entry.exercise?.name ?? "Unknown Exercise") {
+                    Section {
                         ForEach(entry.sortedSets) { set in
                             SetRow(set: set)
+                        }
+                        .onDelete { offsets in
+                            deleteSets(from: entry, at: offsets)
                         }
 
                         HStack {
@@ -59,9 +62,20 @@ struct NewWorkoutView: View {
                             }
                             .buttonStyle(.borderedProminent)
                         }
+                    } header: {
+                        HStack {
+                            Text(entry.exercise?.name ?? "Unknown Exercise")
+                            Spacer()
+                            Button {
+                                deleteExerciseEntry(entry)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundStyle(PlateColor.deadlift)
+                                    .font(.caption)
+                            }
+                        }
                     }
                 }
-                .onDelete(perform: deleteExercises)
 
                 Button {
                     showingExercisePicker = true
@@ -135,14 +149,22 @@ struct NewWorkoutView: View {
         }
     }
 
-    private func deleteExercises(at offsets: IndexSet) {
+    private func deleteSets(from entry: ExerciseEntry, at offsets: IndexSet) {
+        let sorted = entry.sortedSets
         for index in offsets {
-            let entry = workout.exercises[index]
-            if entry.modelContext != nil {
-                modelContext.delete(entry)
+            let setToDelete = sorted[index]
+            if setToDelete.modelContext != nil {
+                modelContext.delete(setToDelete)
             }
+            entry.sets.removeAll { $0.persistentModelID == setToDelete.persistentModelID }
         }
-        workout.exercises.remove(atOffsets: offsets)
+    }
+
+    private func deleteExerciseEntry(_ entry: ExerciseEntry) {
+        if entry.modelContext != nil {
+            modelContext.delete(entry)
+        }
+        workout.exercises.removeAll { $0.persistentModelID == entry.persistentModelID }
     }
 }
 

@@ -31,7 +31,9 @@ struct SetEditorView: View {
         case rir = "RIR"
     }
 
-    private var weightValue: Double? { Double(weightText) }
+    private var weightValue: Double? {
+        Double(weightText.replacingOccurrences(of: ",", with: "."))
+    }
     private var repsValue: Int? { Int(repsText) }
 
     private var isValid: Bool {
