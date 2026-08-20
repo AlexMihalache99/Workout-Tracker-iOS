@@ -63,15 +63,23 @@ struct NewWorkoutView: View {
                             .buttonStyle(.borderedProminent)
                         }
                     } header: {
-                        HStack {
-                            Text(entry.exercise?.name ?? "Unknown Exercise")
-                            Spacer()
-                            Button {
-                                deleteExerciseEntry(entry)
-                            } label: {
-                                Image(systemName: "trash")
-                                    .foregroundStyle(PlateColor.deadlift)
-                                    .font(.caption)
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(entry.exercise?.name ?? "Unknown Exercise")
+                                Spacer()
+                                Button {
+                                    deleteExerciseEntry(entry)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundStyle(PlateColor.deadlift)
+                                        .font(.caption)
+                                }
+                            }
+                            if let lastLabel = entry.lastSessionLabel {
+                                Text("Last time: \(lastLabel)")
+                                    .font(.caption2)
+                                    .foregroundStyle(AppTheme.textSecondary)
+                                    .textCase(nil)
                             }
                         }
                     }

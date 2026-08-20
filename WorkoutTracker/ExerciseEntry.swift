@@ -15,6 +15,8 @@ final class ExerciseEntry {
 
     @Relationship(deleteRule: .cascade)
     var sets: [SetEntry] = []
+    
+    @Transient var lastSessionLabel: String?
 
     init(exercise: Exercise?) {
         self.exercise = exercise

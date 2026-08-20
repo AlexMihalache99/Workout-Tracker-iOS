@@ -21,6 +21,28 @@ struct WorkoutListView: View {
         let names = workout.exercises.compactMap { $0.exercise?.name }
         return names.filter { ["Deadlift", "Bench Press", "Squat"].contains($0) }
     }
+    
+    private func repeatWorkout(_ source: Workout) {
+        let newWorkout = Workout(date: .now, name: source.name)
+        for entry in source.exercises {
+            guard let exercise = entry.exercise else { continue }
+            let newEntry = ExerciseEntry(exercise: exercise)
+            newEntry.lastSessionLabel = lastSessionLabel(for: entry)
+            newWorkout.exercises.append(newEntry)
+        }
+        activeWorkout = newWorkout
+    }
+
+    private func lastSessionLabel(for entry: ExerciseEntry) -> String? {
+        guard let topSet = entry.workingSets.max(by: { $0.weight < $1.weight }) else { return nil }
+        var label = "\(String(format: "%.1f", weightUnit.fromKg(topSet.weight))) \(weightUnit.label) × \(topSet.reps)"
+        if let rpe = topSet.rpe {
+            label += ", RPE \(String(format: "%.1f", rpe))"
+        } else if let rir = topSet.rir {
+            label += ", RIR \(rir)"
+        }
+        return label
+    }
 
     var body: some View {
         NavigationStack {
@@ -60,6 +82,14 @@ struct WorkoutListView: View {
                                 Button("Delete", role: .destructive) {
                                     withAnimation { workoutPendingDelete = workout }
                                 }
+                            }
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    repeatWorkout(workout)
+                                } label: {
+                                    Label("Repeat", systemImage: "arrow.clockwise")
+                                }
+                                .tint(AppTheme.accent)
                             }
                         }
                     }
