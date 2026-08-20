@@ -29,6 +29,9 @@ struct WorkoutTrackerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onAppear {
+                    RestTimerManager.requestAuthorization()
+                }
         }
         .modelContainer(sharedModelContainer)
     }

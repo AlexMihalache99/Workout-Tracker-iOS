@@ -18,6 +18,9 @@ struct NewWorkoutView: View {
     @State private var showingExercisePicker = false
     @State private var setEditorTarget: SetEditorTarget?
     @State private var showingDiscardConfirmation = false
+    @State private var pendingRestDuration: Int? = nil
+    @StateObject private var restTimer = RestTimerManager()
+    @AppStorage("restTimerDuration") private var restTimerDuration: Int = 90
     @FocusState private var nameFieldFocused: Bool
 
     private struct SetEditorTarget: Identifiable {
@@ -55,10 +58,17 @@ struct NewWorkoutView: View {
                             }
                             .buttonStyle(.bordered)
 
-                            Button {
-                                setEditorTarget = SetEditorTarget(entry: entry, type: .working)
+                            Menu {
+                                Button("90s rest") { pendingRestDuration = 90 }
+                                Button("2 min rest") { pendingRestDuration = 120 }
+                                Button("3 min rest") { pendingRestDuration = 180 }
+                                Button("5 min rest") { pendingRestDuration = 300 }
+                                Divider()
+                                Button("Use default (\(restTimerDuration)s)") { pendingRestDuration = nil }
                             } label: {
                                 Label("Working Set", systemImage: "plus.circle")
+                            } primaryAction: {
+                                setEditorTarget = SetEditorTarget(entry: entry, type: .working)
                             }
                             .buttonStyle(.borderedProminent)
                         }
@@ -97,18 +107,19 @@ struct NewWorkoutView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Discard") {
                         if workout.exercises.isEmpty {
+                            restTimer.cancel()
                             dismiss()
                         } else {
                             showingDiscardConfirmation = true
                         }
                     }
                 }
-                
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         modelContext.insert(workout)
                         try? modelContext.save()
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        restTimer.cancel()
                         dismiss()
                     }
                     .disabled(workout.exercises.isEmpty)
@@ -129,6 +140,9 @@ struct NewWorkoutView: View {
                 SetEditorView(setType: target.type, nextSetNumber: nextNumber) { newSet in
                     newSet.exerciseEntry = target.entry
                     target.entry.sets.append(newSet)
+                    if target.type == .working {
+                        restTimer.start(duration: pendingRestDuration ?? restTimerDuration)
+                    }
                 }
             }
             .overlay {
@@ -140,6 +154,7 @@ struct NewWorkoutView: View {
                             if workout.modelContext != nil {
                                 modelContext.delete(workout)
                             }
+                            restTimer.cancel()
                             showingDiscardConfirmation = false
                             dismiss()
                         },
@@ -153,6 +168,15 @@ struct NewWorkoutView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     nameFieldFocused = false
                 }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if restTimer.isActive {
+                    RestTimerBar(manager: restTimer)
+                }
+            }
+            .animation(.easeInOut, value: restTimer.isActive)
+            .onDisappear {
+                restTimer.cancel()
             }
         }
     }
@@ -179,23 +203,30 @@ struct NewWorkoutView: View {
 private struct SetRow: View {
     let set: SetEntry
 
+    @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
+
     var body: some View {
         HStack {
             Text(set.setType == .warmup ? "W" : "\(set.setNumber)")
-                .font(.caption.bold())
-                .foregroundStyle(set.setType == .warmup ? .orange : .primary)
-                .frame(width: 24)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(set.setType == .warmup ? PlateColor.warmup : AppTheme.accent)
+                .clipShape(Circle())
 
-            Text("\(set.weight, specifier: "%.1f") kg × \(set.reps)")
+            Text("\(weightUnit.fromKg(set.weight), specifier: "%.1f") \(weightUnit.label) x \(set.reps)")
 
             Spacer()
 
             if let rpe = set.rpe {
                 Text("RPE \(rpe, specifier: "%.1f")")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } else if let rir = set.rir {
                 Text("RIR \(rir)")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
