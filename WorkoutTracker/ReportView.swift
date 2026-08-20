@@ -1,0 +1,171 @@
+//
+//  ReportView.swift
+//  WorkoutTracker
+//
+//  Created by Alexandru Mihalache on 20/08/2026.
+//
+
+import SwiftUI
+import SwiftData
+
+struct ReportView: View {
+    @Query(sort: \Workout.date) private var allWorkouts: [Workout]
+    @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
+
+    @State private var startDate: Date = Calendar.current.date(byAdding: .weekOfYear, value: -4, to: .now) ?? .now
+    @State private var endDate: Date = .now
+    @State private var phase: TrainingPhase = .strength
+    @State private var report: WorkoutReport?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("PERIOD")
+                            .font(.system(size: 12, weight: .bold)).tracking(1.2)
+                            .foregroundStyle(AppTheme.textSecondary)
+
+                        DatePicker("Start", selection: $startDate, in: ...endDate, displayedComponents: .date)
+                        DatePicker("End", selection: $endDate, in: startDate...Date.now, displayedComponents: .date)
+
+                        Text("FOCUS")
+                            .font(.system(size: 12, weight: .bold)).tracking(1.2)
+                            .foregroundStyle(AppTheme.textSecondary)
+                            .padding(.top, 4)
+
+                        Picker("Focus", selection: $phase) {
+                            ForEach(TrainingPhase.allCases) { p in
+                                Text(p.rawValue).tag(p)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        Button {
+                            report = ReportGenerator.generate(workouts: allWorkouts, start: startDate, end: endDate, phase: phase)
+                        } label: {
+                            Text("Generate Report")
+                                .font(.system(size: 16, weight: .bold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .padding(.top, 4)
+                    }
+                    .cardStyle()
+
+                    if let report {
+                        ReportResultsView(report: report, weightUnit: weightUnit)
+                    }
+                }
+                .padding(16)
+            }
+            .background(AppTheme.background)
+            .navigationTitle("Report")
+        }
+    }
+}
+
+private struct ReportResultsView: View {
+    let report: WorkoutReport
+    let weightUnit: WeightUnit
+
+    var body: some View {
+        VStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("SUMMARY").font(.system(size: 12, weight: .bold)).tracking(1.2).foregroundStyle(AppTheme.textSecondary)
+                HStack {
+                    statBlock("Workouts", "\(report.totalWorkouts)")
+                    statBlock("Sets", "\(report.totalSets)")
+                    statBlock("Reps", "\(report.totalReps)")
+                }
+                statBlock("Total Volume", "\(Int(weightUnit.fromKg(report.totalVolume))) \(weightUnit.label)")
+            }
+            .cardStyle()
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !report.liftProgress.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("LIFT PROGRESS").font(.system(size: 12, weight: .bold)).tracking(1.2).foregroundStyle(AppTheme.textSecondary)
+                    ForEach(report.liftProgress) { lift in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Circle().fill(PlateColor.forExercise(lift.exerciseName)).frame(width: 8, height: 8)
+                                Text(lift.exerciseName).font(.system(size: 15, weight: .semibold)).foregroundStyle(AppTheme.textPrimary)
+                                Spacer()
+                                if let delta = lift.delta {
+                                    Text("\(delta >= 0 ? "+" : "")\(String(format: "%.1f", weightUnit.fromKg(delta))) \(weightUnit.label)")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(delta >= 0 ? .green : PlateColor.deadlift)
+                                }
+                            }
+                            if let start = lift.earliestTopSet, let end = lift.bestTopSet {
+                                Text("\(String(format: "%.1f", weightUnit.fromKg(start))) → \(String(format: "%.1f", weightUnit.fromKg(end))) \(weightUnit.label)")
+                                    .font(.caption).foregroundStyle(AppTheme.textSecondary)
+                            }
+                            if let oneRM = lift.estimatedOneRepMax {
+                                Text("Est. 1RM: \(String(format: "%.1f", weightUnit.fromKg(oneRM))) \(weightUnit.label)")
+                                    .font(.caption2).foregroundStyle(AppTheme.textSecondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        Rectangle().fill(AppTheme.textSecondary.opacity(0.15)).frame(height: 1)
+                    }
+                }
+                .cardStyle()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if !report.weeklyStats.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("WEEKLY BREAKDOWN").font(.system(size: 12, weight: .bold)).tracking(1.2).foregroundStyle(AppTheme.textSecondary)
+                    ForEach(report.weeklyStats) { week in
+                        HStack {
+                            Text(week.weekStart.formatted(date: .abbreviated, time: .omitted))
+                                .font(.system(size: 13)).foregroundStyle(AppTheme.textPrimary)
+                            Spacer()
+                            Text("\(Int(weightUnit.fromKg(week.totalVolume))) \(weightUnit.label)")
+                                .font(.system(size: 12)).foregroundStyle(AppTheme.textSecondary)
+                            if let effort = week.avgEffort {
+                                Text("RPE \(String(format: "%.1f", effort))")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(effortColor(effort))
+                            }
+                        }
+                    }
+                }
+                .cardStyle()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if !report.insights.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("INSIGHTS").font(.system(size: 12, weight: .bold)).tracking(1.2).foregroundStyle(AppTheme.textSecondary)
+                    ForEach(report.insights, id: \.self) { insight in
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "sparkle").foregroundStyle(AppTheme.accent).font(.caption)
+                            Text(insight).font(.system(size: 14)).foregroundStyle(AppTheme.textPrimary)
+                        }
+                    }
+                }
+                .cardStyle()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func statBlock(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value).font(.system(size: 20, weight: .bold, design: .rounded)).foregroundStyle(AppTheme.textPrimary)
+            Text(label).font(.caption2).foregroundStyle(AppTheme.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func effortColor(_ effort: Double) -> Color {
+        if effort >= 8.5 { return PlateColor.deadlift }
+        if effort >= 7 { return PlateColor.squat }
+        return .green
+    }
+}
