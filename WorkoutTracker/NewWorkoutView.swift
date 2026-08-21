@@ -137,13 +137,18 @@ struct NewWorkoutView: View {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }) { target in
                 let nextNumber = target.entry.sets.filter { $0.setType == target.type }.count + 1
-                SetEditorView(setType: target.type, nextSetNumber: nextNumber) { newSet in
-                    newSet.exerciseEntry = target.entry
-                    target.entry.sets.append(newSet)
-                    if target.type == .working {
-                        restTimer.start(duration: pendingRestDuration ?? restTimerDuration)
-                    }
-                }
+                SetEditorView(
+                    setType: target.type,
+                    nextSetNumber: nextNumber,
+                    onSave: { newSet in
+                        newSet.exerciseEntry = target.entry
+                        target.entry.sets.append(newSet)
+                        if target.type == .working {
+                            restTimer.start(duration: pendingRestDuration ?? restTimerDuration)
+                        }
+                    },
+                    prMetric: target.entry.exercise?.prMetric
+                )
             }
             .overlay {
                 if showingDiscardConfirmation {

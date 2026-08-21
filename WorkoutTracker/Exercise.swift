@@ -11,6 +11,7 @@ import SwiftData
 enum PRMetric: String, Codable, CaseIterable {
     case weight
     case reps
+    case assisted
 }
 
 @Model

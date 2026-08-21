@@ -91,7 +91,7 @@ struct WorkoutDetailView: View {
         .navigationTitle(workout.name ?? workout.date.formatted(date: .abbreviated, time: .omitted))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $setEditorTarget) { target in
-            SetEditorView(setType: target.set.setType, nextSetNumber: target.set.setNumber, editingSet: target.set) { _ in }
+            SetEditorView(setType: target.set.setType, nextSetNumber: target.set.setNumber, editingSet: target.set, prMetric: target.entry.exercise?.prMetric) { _ in }
         }
         .scrollContentBackground(.hidden)
         .background(AppTheme.background)

@@ -21,6 +21,7 @@ struct ExerciseDetailView: View {
     // Pull every ExerciseEntry for this exercise, across all workouts
     @Query private var allEntries: [ExerciseEntry]
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    @AppStorage("bodyweightKg") private var bodyweightKg: Double = 0
     private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
 
     init(exercise: Exercise) {
@@ -30,6 +31,14 @@ struct ExerciseDetailView: View {
             filter: #Predicate<ExerciseEntry> { $0.exercise?.name == name },
             sort: []
         )
+    }
+    
+    private enum PRTrackingOption: String, CaseIterable, Identifiable {
+        case none = "Not Tracked"
+        case weight = "Weight"
+        case reps = "Reps"
+        case assisted = "Assisted"
+        var id: String { rawValue }
     }
 
     private var sortedEntries: [ExerciseEntry] {
@@ -50,6 +59,15 @@ struct ExerciseDetailView: View {
             .map { $0.reps }
             .max()
     }
+    
+    private var personalRecordAssistance: Double? {
+        allEntries.flatMap { $0.workingSets }.map { $0.weight }.min()
+    }
+
+    private var personalRecordEffectiveLoad: Double? {
+        guard bodyweightKg > 0, let minAssistance = personalRecordAssistance else { return nil }
+        return bodyweightKg - minAssistance
+    }
 
     var body: some View {
         List {
@@ -60,6 +78,7 @@ struct ExerciseDetailView: View {
                         switch exercise.prMetric {
                         case .weight: return .weight
                         case .reps: return .reps
+                        case .assisted: return .assisted
                         case nil: return .none
                         }
                     },
@@ -68,6 +87,7 @@ struct ExerciseDetailView: View {
                         case .none: exercise.prMetric = nil
                         case .weight: exercise.prMetric = .weight
                         case .reps: exercise.prMetric = .reps
+                        case .assisted: exercise.prMetric = .assisted
                         }
                     }
                 )) {
@@ -90,6 +110,20 @@ struct ExerciseDetailView: View {
                     Text("At bodyweight (0 added)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+            } else if exercise.prMetric == .assisted {
+                Section("Personal Record") {
+                    if bodyweightKg <= 0 {
+                        Text("Set your bodyweight in Settings to see this.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else if let effective = personalRecordEffectiveLoad, let assistance = personalRecordAssistance {
+                        Text("\(weightUnit.fromKg(effective), specifier: "%.1f") \(weightUnit.label)")
+                            .font(.title2.bold())
+                        Text("Effective load (\(weightUnit.fromKg(assistance), specifier: "%.1f") \(weightUnit.label) assistance)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 

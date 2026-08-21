@@ -33,6 +33,8 @@ struct PRDashboardView: View {
                                 WeightProgressCard(exercise: exercise)
                             } else if exercise.prMetric == .reps {
                                 RepsProgressCard(exercise: exercise)
+                            } else if exercise.prMetric == .assisted {
+                                AssistedProgressCard(exercise: exercise)
                             }
                         }
                     }
@@ -259,6 +261,116 @@ private struct RepsProgressCard: View {
                     }
                 } else if dataPoints.count == 1 {
                     Text("Log one more bodyweight session to see a trend line")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.textSecondary)
+                }
+            }
+            .padding(16)
+        }
+        .background(AppTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+private struct AssistedProgressCard: View {
+    let exercise: Exercise
+    @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    @AppStorage("bodyweightKg") private var bodyweightKg: Double = 0
+    private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
+
+    @Query private var allEntries: [ExerciseEntry]
+
+    init(exercise: Exercise) {
+        self.exercise = exercise
+        let name = exercise.name
+        _allEntries = Query(filter: #Predicate<ExerciseEntry> { $0.exercise?.name == name })
+    }
+
+    private struct DataPoint: Identifiable {
+        let id = UUID()
+        let date: Date
+        let effectiveLoad: Double
+    }
+
+    private var plateColor: Color { PlateColor.forExercise(exercise.name) }
+
+    // Least assistance in a session = highest effective load = best session
+    private var dataPoints: [DataPoint] {
+        guard bodyweightKg > 0 else { return [] }
+        return allEntries
+            .compactMap { entry -> DataPoint? in
+                guard let date = entry.workout?.date,
+                      let minAssistance = entry.workingSets.map({ $0.weight }).min() else { return nil }
+                return DataPoint(date: date, effectiveLoad: bodyweightKg - minAssistance)
+            }
+            .sorted { $0.date < $1.date }
+    }
+
+    private var personalRecord: Double? { dataPoints.map { $0.effectiveLoad }.max() }
+    private var lastSessionLoad: Double? { dataPoints.last?.effectiveLoad }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Rectangle().fill(plateColor).frame(width: 5)
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(exercise.name.uppercased())
+                            .font(.system(size: 12, weight: .bold))
+                            .tracking(1.2)
+                            .foregroundStyle(AppTheme.textSecondary)
+
+                        if bodyweightKg <= 0 {
+                            Text("Set bodyweight in Settings")
+                                .font(.subheadline)
+                                .foregroundStyle(AppTheme.textSecondary)
+                        } else if let pr = personalRecord {
+                            HStack(alignment: .lastTextBaseline, spacing: 4) {
+                                Text("\(weightUnit.fromKg(pr), specifier: "%.1f")")
+                                    .font(.heroNumber())
+                                    .foregroundStyle(AppTheme.textPrimary)
+                                Text(weightUnit.label)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(AppTheme.textSecondary)
+                            }
+                            Text("effective load moved")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(AppTheme.textSecondary)
+                        } else {
+                            Text("No data yet")
+                                .font(.subheadline)
+                                .foregroundStyle(AppTheme.textSecondary)
+                        }
+                    }
+                    Spacer()
+                    if let pr = personalRecord, let last = lastSessionLoad, dataPoints.count > 1 {
+                        Image(systemName: last == pr ? "flame.fill" : "arrow.up.right")
+                            .foregroundStyle(last == pr ? plateColor : .green)
+                            .font(.title3)
+                    }
+                }
+
+                if dataPoints.count >= 2 {
+                    Chart(dataPoints) { point in
+                        LineMark(x: .value("Date", point.date), y: .value("Load", weightUnit.fromKg(point.effectiveLoad)))
+                            .interpolationMethod(.monotone)
+                            .foregroundStyle(plateColor)
+                        PointMark(x: .value("Date", point.date), y: .value("Load", weightUnit.fromKg(point.effectiveLoad)))
+                            .foregroundStyle(plateColor)
+                    }
+                    .frame(height: 120)
+                    .chartYAxis {
+                        AxisMarks(position: .leading) {
+                            AxisGridLine().foregroundStyle(AppTheme.textSecondary.opacity(0.2))
+                            AxisValueLabel().foregroundStyle(AppTheme.textSecondary)
+                        }
+                    }
+                    .chartXAxis {
+                        AxisMarks { AxisValueLabel().foregroundStyle(AppTheme.textSecondary) }
+                    }
+                } else if dataPoints.count == 1 {
+                    Text("Log one more session to see a trend line")
                         .font(.caption)
                         .foregroundStyle(AppTheme.textSecondary)
                 }

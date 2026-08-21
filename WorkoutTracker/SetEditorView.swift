@@ -12,6 +12,7 @@ struct SetEditorView: View {
     let nextSetNumber: Int
     var editingSet: SetEntry? = nil
     var onSave: (SetEntry) -> Void
+    var prMetric: PRMetric? = nil
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
@@ -53,7 +54,7 @@ struct SetEditorView: View {
             Form {
                 Section("Set Details") {
                     HStack {
-                        Text("Weight (\(weightUnit.label))")
+                        Text(prMetric == .assisted ? "Assistance (\(weightUnit.label))" : "Weight (\(weightUnit.label))")
                         Spacer()
                         TextField("0", text: $weightText)
                             .keyboardType(.decimalPad)
