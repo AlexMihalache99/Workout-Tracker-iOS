@@ -10,19 +10,30 @@ import SwiftData
 import Charts
 
 struct PRDashboardView: View {
-    @Query(filter: #Predicate<Exercise> { $0.isMainLift == true })
-    private var mainLifts: [Exercise]
+    @Query private var allExercises: [Exercise]
+
+    private var trackedExercises: [Exercise] {
+        allExercises.filter { $0.prMetric != nil }
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    if mainLifts.isEmpty {
-                        ContentUnavailableView("No Main Lifts Found", systemImage: "chart.line.uptrend.xyaxis")
-                            .padding(.top, 60)
+                    if trackedExercises.isEmpty {
+                        ContentUnavailableView(
+                            "No Tracked Exercises",
+                            systemImage: "chart.line.uptrend.xyaxis",
+                            description: Text("Turn on PR tracking for an exercise from its detail screen.")
+                        )
+                        .padding(.top, 60)
                     } else {
-                        ForEach(mainLifts) { lift in
-                            LiftProgressCard(exercise: lift)
+                        ForEach(sortedExercises) { exercise in
+                            if exercise.prMetric == .weight {
+                                WeightProgressCard(exercise: exercise)
+                            } else if exercise.prMetric == .reps {
+                                RepsProgressCard(exercise: exercise)
+                            }
                         }
                     }
                 }
@@ -32,11 +43,21 @@ struct PRDashboardView: View {
             .navigationTitle("Personal Records")
         }
     }
+
+    private var sortedExercises: [Exercise] {
+        trackedExercises.sorted { lhs, rhs in
+            if lhs.category != rhs.category {
+                return lhs.category == "Big 3"
+            }
+            return lhs.name < rhs.name
+        }
+    }
 }
 
-private struct LiftProgressCard: View {
+private struct WeightProgressCard: View {
     let exercise: Exercise
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    @AppStorage("bodyweightKg") private var bodyweightKg: Double = 0
     private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
 
     @Query private var allEntries: [ExerciseEntry]
@@ -68,11 +89,14 @@ private struct LiftProgressCard: View {
     private var personalRecord: Double? { dataPoints.map { $0.maxWeight }.max() }
     private var lastSessionWeight: Double? { dataPoints.last?.maxWeight }
 
+    private var bodyweightRatio: String? {
+        guard bodyweightKg > 0, let pr = personalRecord else { return nil }
+        return String(format: "%.2fx bodyweight", pr / bodyweightKg)
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            Rectangle()
-                .fill(plateColor)
-                .frame(width: 5)
+            Rectangle().fill(plateColor).frame(width: 5)
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline) {
@@ -83,13 +107,18 @@ private struct LiftProgressCard: View {
                             .foregroundStyle(AppTheme.textSecondary)
 
                         if let pr = personalRecord {
-                            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            HStack(alignment: .lastTextBaseline, spacing: 4) {
                                 Text("\(weightUnit.fromKg(pr), specifier: "%.1f")")
                                     .font(.heroNumber())
                                     .foregroundStyle(AppTheme.textPrimary)
-
                                 Text(weightUnit.label)
                                     .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(AppTheme.textSecondary)
+                            }
+
+                            if let ratio = bodyweightRatio {
+                                Text(ratio)
+                                    .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(AppTheme.textSecondary)
                             }
                         } else {
@@ -108,18 +137,11 @@ private struct LiftProgressCard: View {
 
                 if dataPoints.count >= 2 {
                     Chart(dataPoints) { point in
-                        LineMark(
-                            x: .value("Date", point.date),
-                            y: .value("Weight", weightUnit.fromKg(point.maxWeight))
-                        )
-                        .interpolationMethod(.monotone)
-                        .foregroundStyle(plateColor)
-
-                        PointMark(
-                            x: .value("Date", point.date),
-                            y: .value("Weight", weightUnit.fromKg(point.maxWeight))
-                        )
-                        .foregroundStyle(plateColor)
+                        LineMark(x: .value("Date", point.date), y: .value("Weight", weightUnit.fromKg(point.maxWeight)))
+                            .interpolationMethod(.monotone)
+                            .foregroundStyle(plateColor)
+                        PointMark(x: .value("Date", point.date), y: .value("Weight", weightUnit.fromKg(point.maxWeight)))
+                            .foregroundStyle(plateColor)
                     }
                     .frame(height: 120)
                     .chartYAxis {
@@ -133,6 +155,110 @@ private struct LiftProgressCard: View {
                     }
                 } else if dataPoints.count == 1 {
                     Text("Log one more session to see a trend line")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.textSecondary)
+                }
+            }
+            .padding(16)
+        }
+        .background(AppTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+
+private struct RepsProgressCard: View {
+    let exercise: Exercise
+
+    @Query private var allEntries: [ExerciseEntry]
+
+    init(exercise: Exercise) {
+        self.exercise = exercise
+        let name = exercise.name
+        _allEntries = Query(filter: #Predicate<ExerciseEntry> { $0.exercise?.name == name })
+    }
+
+    private struct DataPoint: Identifiable {
+        let id = UUID()
+        let date: Date
+        let maxReps: Int
+    }
+
+    private var plateColor: Color { PlateColor.forExercise(exercise.name) }
+
+    // Only bodyweight (0kg) sets count toward the reps PR
+    private var dataPoints: [DataPoint] {
+        allEntries
+            .compactMap { entry -> DataPoint? in
+                guard let date = entry.workout?.date else { return nil }
+                let bodyweightSets = entry.workingSets.filter { $0.weight == 0 }
+                guard let sessionMax = bodyweightSets.map({ $0.reps }).max() else { return nil }
+                return DataPoint(date: date, maxReps: sessionMax)
+            }
+            .sorted { $0.date < $1.date }
+    }
+
+    private var personalRecord: Int? { dataPoints.map { $0.maxReps }.max() }
+    private var lastSessionReps: Int? { dataPoints.last?.maxReps }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Rectangle().fill(plateColor).frame(width: 5)
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(exercise.name.uppercased())
+                            .font(.system(size: 12, weight: .bold))
+                            .tracking(1.2)
+                            .foregroundStyle(AppTheme.textSecondary)
+
+                        if let pr = personalRecord {
+                            HStack(alignment: .lastTextBaseline, spacing: 4) {
+                                Text("\(pr)")
+                                    .font(.heroNumber())
+                                    .foregroundStyle(AppTheme.textPrimary)
+                                Text("reps")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(AppTheme.textSecondary)
+                            }
+                            Text("at bodyweight")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(AppTheme.textSecondary)
+                        } else {
+                            Text("No bodyweight sets yet")
+                                .font(.subheadline)
+                                .foregroundStyle(AppTheme.textSecondary)
+                        }
+                    }
+                    Spacer()
+                    if let pr = personalRecord, let last = lastSessionReps, dataPoints.count > 1 {
+                        Image(systemName: last == pr ? "flame.fill" : "arrow.up.right")
+                            .foregroundStyle(last == pr ? plateColor : .green)
+                            .font(.title3)
+                    }
+                }
+
+                if dataPoints.count >= 2 {
+                    Chart(dataPoints) { point in
+                        LineMark(x: .value("Date", point.date), y: .value("Reps", point.maxReps))
+                            .interpolationMethod(.monotone)
+                            .foregroundStyle(plateColor)
+                        PointMark(x: .value("Date", point.date), y: .value("Reps", point.maxReps))
+                            .foregroundStyle(plateColor)
+                    }
+                    .frame(height: 120)
+                    .chartYAxis {
+                        AxisMarks(position: .leading) {
+                            AxisGridLine().foregroundStyle(AppTheme.textSecondary.opacity(0.2))
+                            AxisValueLabel().foregroundStyle(AppTheme.textSecondary)
+                        }
+                    }
+                    .chartXAxis {
+                        AxisMarks { AxisValueLabel().foregroundStyle(AppTheme.textSecondary) }
+                    }
+                } else if dataPoints.count == 1 {
+                    Text("Log one more bodyweight session to see a trend line")
                         .font(.caption)
                         .foregroundStyle(AppTheme.textSecondary)
                 }

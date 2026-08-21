@@ -13,6 +13,8 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
     @AppStorage("restTimerDuration") private var restTimerDuration: Int = 90
+    @AppStorage("bodyweightKg") private var bodyweightKg: Double = 0
+    
 
     private var weightUnit: Binding<WeightUnit> {
         Binding(
@@ -33,6 +35,9 @@ struct SettingsView: View {
     // Feedback
     @State private var feedbackMessage: String?
     @State private var feedbackIsError = false
+    
+    //Weight
+    @FocusState private var bodyweightFieldFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -49,6 +54,26 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     
+                }
+
+                Section("Body Metrics") {
+                    HStack {
+                        Text("Current Bodyweight")
+                        Spacer()
+                        TextField("Not set", value: Binding(
+                            get: { bodyweightKg > 0 ? weightUnit.wrappedValue.fromKg(bodyweightKg) : 0 },
+                            set: { bodyweightKg = weightUnit.wrappedValue.toKg($0) }
+                        ), format: .number.precision(.fractionLength(1)))
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .focused($bodyweightFieldFocused)
+                        Text(weightUnit.wrappedValue.label)
+                            .foregroundStyle(.secondary)
+                        
+                    }
+                    Text("Used to show your main lifts relative to bodyweight. Leave blank to skip this.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Rest Timer") {
@@ -85,6 +110,14 @@ struct SettingsView: View {
 
             }
             .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        bodyweightFieldFocused = false
+                    }
+                }
+            }
             .fileExporter(
                 isPresented: $showingExporter,
                 document: exportDocument,
@@ -145,6 +178,7 @@ struct SettingsView: View {
             } message: {
                 Text(feedbackMessage ?? "")
             }
+            
         }
     }
 
