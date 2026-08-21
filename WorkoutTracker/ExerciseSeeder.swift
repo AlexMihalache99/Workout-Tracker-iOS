@@ -79,7 +79,27 @@ struct ExerciseSeeder {
             ("Upright Row", "Accessory", false),
             ("V Sit-Up", "Accessory", false),
             ("Weighted Dip", "Accessory", false),
-            ("Weighted Pull-Up", "Accessory", false)
+            ("Weighted Pull-Up", "Accessory", false),
+            ("Ab Wheel Rollout", "Accessory", false),
+            ("Arnold Press", "Accessory", false),
+            ("Cable Crunch", "Accessory", false),
+            ("Cable Flye", "Accessory", false),
+            ("Cable Lateral Raise", "Accessory", false),
+            ("Dumbbell Bench Press", "Accessory", false),
+            ("Dumbbell Shoulder Press", "Accessory", false),
+            ("Front Squat", "Accessory", false),
+            ("Goblet Squat", "Accessory", false),
+            ("Hack Squat", "Accessory", false),
+            ("Incline Bench Press", "Accessory", false),
+            ("Lat Pulldown", "Accessory", false),
+            ("Leg Press", "Accessory", false),
+            ("Machine Chest Press", "Accessory", false),
+            ("Plank", "Accessory", false),
+            ("Preacher Curl", "Accessory", false),
+            ("Romanian Deadlift", "Accessory", false),
+            ("Seated Cable Row", "Accessory", false),
+            ("Walking Lunge", "Accessory", false)
+
         ]
 
         for (name, category, isMain) in defaults where !existingNames.contains(name) {
