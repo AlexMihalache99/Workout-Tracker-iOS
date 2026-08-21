@@ -11,103 +11,125 @@ import SwiftData
 struct ExerciseSeeder {
     static func seedIfNeeded(context: ModelContext) {
         let descriptor = FetchDescriptor<Exercise>()
-        let existingExercises = (try? context.fetch(descriptor)) ?? []
-        let existingNames = Set(existingExercises.map(\.name))
+        let existingCount = (try? context.fetchCount(descriptor)) ?? 0
+        guard existingCount == 0 else { return }
 
-        let defaults: [(String, String, Bool)] = [
-            ("Deadlift", "Big 3", true),
-            ("Bench Press", "Big 3", true),
-            ("Squat", "Big 3", true),
-            ("Assisted Chin-Up", "Accessory", false),
-            ("Assisted Dip", "Accessory", false),
-            ("Assisted Pull-Up", "Accessory", false),
-            ("Band Lateral Walk", "Accessory", false),
-            ("Band Pull-Apart", "Accessory", false),
-            ("Barbell Curl", "Accessory", false),
-            ("Barbell Floor Press", "Accessory", false),
-            ("Barbell Skull Crusher", "Accessory", false),
-            ("Bent Over Reverse Dumbbell Flye", "Accessory", false),
-            ("Barbell Row", "Accessory", false),
-            ("Bicycle Crunch", "Accessory", false),
-            ("Block Pull", "Accessory", false),
-            ("Bulgarian Split Squat", "Accessory", false),
-            ("Chest-Supported Dumbbell Row", "Accessory", false),
-            ("Chest-Supported T-Bar Row", "Accessory", false),
-            ("Chin-Up", "Accessory", false),
-            ("Close Grip Bench Press", "Accessory", false),
-            ("Concentration Bicep Curl", "Accessory", false),
-            ("Deficit Push-Up", "Accessory", false),
-            ("Dumbbell Curl", "Accessory", false),
-            ("Dumbbell Incline Press", "Accessory", false),
-            ("Dumbbell Lateral Raise", "Accessory", false),
-            ("Dumbbell Shrug", "Accessory", false),
-            ("Dumbbell Skull Crusher", "Accessory", false),
-            ("Eccentric Accentuated Pull-Up", "Accessory", false),
-            ("EZ Bar Curl", "Accessory", false),
-            ("EZ Bar Skull Crusher", "Accessory", false),
-            ("Face Pull", "Accessory", false),
-            ("Flat Back Barbell Bench Press", "Accessory", false),
-            ("Floor Skull Crusher", "Accessory", false),
-            ("Glute Ham Raise", "Accessory", false),
-            ("Good Morning", "Accessory", false),
-            ("Hammer Curl", "Accessory", false),
-            ("Hanging Leg Raise", "Accessory", false),
-            ("Helms Row", "Accessory", false),
-            ("Hip Abduction", "Accessory", false),
-            ("Hip Thrust", "Accessory", false),
-            ("Incline Dumbbell Curl", "Accessory", false),
-            ("Incline Shrug", "Accessory", false),
-            ("Lat Pullover", "Accessory", false),
-            ("Lean-Away Lateral Raise", "Accessory", false),
-            ("Leg Curl", "Accessory", false),
-            ("Leg Extension", "Accessory", false),
-            ("Neutral Grip Pull-Up", "Accessory", false),
-            ("Nordic Ham Curl", "Accessory", false),
-            ("Overhead Press", "Accessory", false),
-            ("Pause Barbell Bench Press", "Accessory", false),
-            ("Pause Deadlift", "Accessory", false),
-            ("Pause High-Bar Squat", "Accessory", false),
-            ("Pec Flye", "Accessory", false),
-            ("Pendlay Row", "Accessory", false),
-            ("Seated Calf Raise", "Accessory", false),
-            ("Single-Arm Lat Pulldown", "Accessory", false),
-            ("Single-Arm Row", "Accessory", false),
-            ("Snatch Grip Romanian Deadlift", "Accessory", false),
-            ("Standing Calf Raise", "Accessory", false),
-            ("Sumo Box Squat", "Accessory", false),
-            ("Triceps Pressdown", "Accessory", false),
-            ("Upright Row", "Accessory", false),
-            ("V Sit-Up", "Accessory", false),
-            ("Weighted Dip", "Accessory", false),
-            ("Weighted Pull-Up", "Accessory", false),
-            ("Ab Wheel Rollout", "Accessory", false),
-            ("Arnold Press", "Accessory", false),
-            ("Cable Crunch", "Accessory", false),
-            ("Cable Flye", "Accessory", false),
-            ("Cable Lateral Raise", "Accessory", false),
-            ("Dumbbell Bench Press", "Accessory", false),
-            ("Dumbbell Shoulder Press", "Accessory", false),
-            ("Front Squat", "Accessory", false),
-            ("Goblet Squat", "Accessory", false),
-            ("Hack Squat", "Accessory", false),
-            ("Incline Bench Press", "Accessory", false),
-            ("Lat Pulldown", "Accessory", false),
-            ("Leg Press", "Accessory", false),
-            ("Machine Chest Press", "Accessory", false),
-            ("Plank", "Accessory", false),
-            ("Preacher Curl", "Accessory", false),
-            ("Romanian Deadlift", "Accessory", false),
-            ("Seated Cable Row", "Accessory", false),
-            ("Walking Lunge", "Accessory", false)
-
-        ]
-
-        for (name, category, isMain) in defaults where !existingNames.contains(name) {
-            context.insert(Exercise(name: name, category: category, isMainLift: isMain))
+        for (name, category, isMain, metric) in defaults {
+            context.insert(Exercise(name: name, category: category, isMainLift: isMain, prMetric: metric))
         }
-
-        if context.hasChanges {
-            try? context.save()
-        }
+        try? context.save()
     }
+
+    /// One-time migration for installs that already had exercises seeded before
+    /// prMetric existed. Sets prMetric from isMainLift, and assigns .reps to
+    /// known bodyweight movements by name. Runs once, guarded by a flag, so it
+    /// never overwrites a tracking choice you make later via Exercise Detail.
+    static func migratePRMetricIfNeeded(context: ModelContext) {
+        let flagKey = "didMigratePRMetric"
+        guard !UserDefaults.standard.bool(forKey: flagKey) else { return }
+
+        let allExercises = (try? context.fetch(FetchDescriptor<Exercise>())) ?? []
+        let repsTrackedByDefault: Set<String> = ["Chin-Up", "Neutral Grip Pull-Up"]
+        let weightTrackedAccessories: Set<String> = ["Weighted Pull-Up", "Weighted Dip"]
+
+        for exercise in allExercises where exercise.prMetric == nil {
+            if exercise.isMainLift {
+                exercise.prMetric = .weight
+            } else if repsTrackedByDefault.contains(exercise.name) {
+                exercise.prMetric = .reps
+            } else if weightTrackedAccessories.contains(exercise.name) {
+                exercise.prMetric = .weight
+            }
+        }
+
+        try? context.save()
+        UserDefaults.standard.set(true, forKey: flagKey)
+    }
+
+    private static let defaults: [(String, String, Bool, PRMetric?)] = [
+        ("Deadlift", "Big 3", true, .weight),
+        ("Bench Press", "Big 3", true, .weight),
+        ("Squat", "Big 3", true, .weight),
+        ("Assisted Chin-Up", "Accessory", false, nil),
+        ("Assisted Dip", "Accessory", false, nil),
+        ("Assisted Pull-Up", "Accessory", false, nil),
+        ("Band Lateral Walk", "Accessory", false, nil),
+        ("Band Pull-Apart", "Accessory", false, nil),
+        ("Barbell Curl", "Accessory", false, nil),
+        ("Barbell Floor Press", "Accessory", false, nil),
+        ("Barbell Skull Crusher", "Accessory", false, nil),
+        ("Bent Over Reverse Dumbbell Flye", "Accessory", false, nil),
+        ("Barbell Row", "Accessory", false, nil),
+        ("Bicycle Crunch", "Accessory", false, nil),
+        ("Block Pull", "Accessory", false, nil),
+        ("Bulgarian Split Squat", "Accessory", false, nil),
+        ("Chest-Supported Dumbbell Row", "Accessory", false, nil),
+        ("Chest-Supported T-Bar Row", "Accessory", false, nil),
+        ("Chin-Up", "Accessory", false, .reps),
+        ("Close Grip Bench Press", "Accessory", false, nil),
+        ("Concentration Bicep Curl", "Accessory", false, nil),
+        ("Deficit Push-Up", "Accessory", false, nil),
+        ("Dumbbell Curl", "Accessory", false, nil),
+        ("Dumbbell Incline Press", "Accessory", false, nil),
+        ("Dumbbell Lateral Raise", "Accessory", false, nil),
+        ("Dumbbell Shrug", "Accessory", false, nil),
+        ("Dumbbell Skull Crusher", "Accessory", false, nil),
+        ("Eccentric Accentuated Pull-Up", "Accessory", false, nil),
+        ("EZ Bar Curl", "Accessory", false, nil),
+        ("EZ Bar Skull Crusher", "Accessory", false, nil),
+        ("Face Pull", "Accessory", false, nil),
+        ("Flat Back Barbell Bench Press", "Accessory", false, nil),
+        ("Floor Skull Crusher", "Accessory", false, nil),
+        ("Glute Ham Raise", "Accessory", false, nil),
+        ("Good Morning", "Accessory", false, nil),
+        ("Hammer Curl", "Accessory", false, nil),
+        ("Hanging Leg Raise", "Accessory", false, nil),
+        ("Helms Row", "Accessory", false, nil),
+        ("Hip Abduction", "Accessory", false, nil),
+        ("Hip Thrust", "Accessory", false, nil),
+        ("Incline Dumbbell Curl", "Accessory", false, nil),
+        ("Incline Shrug", "Accessory", false, nil),
+        ("Lat Pullover", "Accessory", false, nil),
+        ("Lean-Away Lateral Raise", "Accessory", false, nil),
+        ("Leg Curl", "Accessory", false, nil),
+        ("Leg Extension", "Accessory", false, nil),
+        ("Neutral Grip Pull-Up", "Accessory", false, .reps),
+        ("Nordic Ham Curl", "Accessory", false, nil),
+        ("Overhead Press", "Accessory", false, nil),
+        ("Pause Barbell Bench Press", "Accessory", false, nil),
+        ("Pause Deadlift", "Accessory", false, nil),
+        ("Pause High-Bar Squat", "Accessory", false, nil),
+        ("Pec Flye", "Accessory", false, nil),
+        ("Pendlay Row", "Accessory", false, nil),
+        ("Seated Calf Raise", "Accessory", false, nil),
+        ("Single-Arm Lat Pulldown", "Accessory", false, nil),
+        ("Single-Arm Row", "Accessory", false, nil),
+        ("Snatch Grip Romanian Deadlift", "Accessory", false, nil),
+        ("Standing Calf Raise", "Accessory", false, nil),
+        ("Sumo Box Squat", "Accessory", false, nil),
+        ("Triceps Pressdown", "Accessory", false, nil),
+        ("Upright Row", "Accessory", false, nil),
+        ("V Sit-Up", "Accessory", false, nil),
+        ("Weighted Dip", "Accessory", false, .weight),
+        ("Weighted Pull-Up", "Accessory", false, .weight),
+        ("Ab Wheel Rollout", "Accessory", false, nil),
+        ("Arnold Press", "Accessory", false, nil),
+        ("Cable Crunch", "Accessory", false, nil),
+        ("Cable Flye", "Accessory", false, nil),
+        ("Cable Lateral Raise", "Accessory", false, nil),
+        ("Dumbbell Bench Press", "Accessory", false, nil),
+        ("Dumbbell Shoulder Press", "Accessory", false, nil),
+        ("Front Squat", "Accessory", false, nil),
+        ("Goblet Squat", "Accessory", false, nil),
+        ("Hack Squat", "Accessory", false, nil),
+        ("Incline Bench Press", "Accessory", false, nil),
+        ("Lat Pulldown", "Accessory", false, nil),
+        ("Leg Press", "Accessory", false, nil),
+        ("Machine Chest Press", "Accessory", false, nil),
+        ("Plank", "Accessory", false, nil),
+        ("Preacher Curl", "Accessory", false, nil),
+        ("Romanian Deadlift", "Accessory", false, nil),
+        ("Seated Cable Row", "Accessory", false, nil),
+        ("Walking Lunge", "Accessory", false, nil)
+    ]
 }

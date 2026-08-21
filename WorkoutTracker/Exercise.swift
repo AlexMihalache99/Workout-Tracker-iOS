@@ -8,15 +8,22 @@
 import Foundation
 import SwiftData
 
+enum PRMetric: String, Codable, CaseIterable {
+    case weight
+    case reps
+}
+
 @Model
 final class Exercise {
     var name: String
-    var category: String   // e.g. "Big 3", "Accessory", "Cardio"
-    var isMainLift: Bool   // true for Deadlift, Bench Press, Squat
+    var category: String
+    var isMainLift: Bool
+    var prMetric: PRMetric?
 
-    init(name: String, category: String, isMainLift: Bool = false) {
+    init(name: String, category: String, isMainLift: Bool = false, prMetric: PRMetric? = nil) {
         self.name = name
         self.category = category
         self.isMainLift = isMainLift
+        self.prMetric = prMetric
     }
 }

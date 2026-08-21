@@ -8,6 +8,13 @@
 import SwiftUI
 import SwiftData
 
+private enum PRTrackingOption: String, CaseIterable, Identifiable {
+    case none = "Not Tracked"
+    case weight = "Weight"
+    case reps = "Reps"
+    var id: String { rawValue }
+}
+
 struct ExerciseDetailView: View {
     let exercise: Exercise
 
@@ -29,19 +36,60 @@ struct ExerciseDetailView: View {
         allEntries.sorted { ($0.workout?.date ?? .distantPast) > ($1.workout?.date ?? .distantPast) }
     }
 
-    private var personalRecord: Double? {
+    private var personalRecordWeight: Double? {
         allEntries
             .flatMap { $0.workingSets }
             .map { $0.weight }
             .max()
     }
 
+    private var personalRecordReps: Int? {
+        allEntries
+            .flatMap { $0.workingSets }
+            .filter { $0.weight == 0 }
+            .map { $0.reps }
+            .max()
+    }
+
     var body: some View {
         List {
-            if exercise.isMainLift, let pr = personalRecord {
+            
+            Section("PR Tracking") {
+                Picker("Track Progress By", selection: Binding<PRTrackingOption>(
+                    get: {
+                        switch exercise.prMetric {
+                        case .weight: return .weight
+                        case .reps: return .reps
+                        case nil: return .none
+                        }
+                    },
+                    set: { newValue in
+                        switch newValue {
+                        case .none: exercise.prMetric = nil
+                        case .weight: exercise.prMetric = .weight
+                        case .reps: exercise.prMetric = .reps
+                        }
+                    }
+                )) {
+                    ForEach(PRTrackingOption.allCases) { option in
+                        Text(option.rawValue).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+            
+            if exercise.prMetric == .weight, let pr = personalRecordWeight {
                 Section("Personal Record") {
                     Text("\(weightUnit.fromKg(pr), specifier: "%.1f") \(weightUnit.label)")
                         .font(.title2.bold())
+                }
+            } else if exercise.prMetric == .reps, let pr = personalRecordReps {
+                Section("Personal Record") {
+                    Text("\(pr) reps")
+                        .font(.title2.bold())
+                    Text("At bodyweight (0 added)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 

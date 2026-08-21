@@ -33,6 +33,7 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             ExerciseSeeder.seedIfNeeded(context: modelContext)
+            ExerciseSeeder.migratePRMetricIfNeeded(context: modelContext)
         }
     }
 }
