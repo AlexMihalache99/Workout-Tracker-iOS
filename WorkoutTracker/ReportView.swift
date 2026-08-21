@@ -10,7 +10,9 @@ import SwiftData
 
 struct ReportView: View {
     @Query(sort: \Workout.date) private var allWorkouts: [Workout]
+    @Query private var allExercises: [Exercise]
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    @AppStorage("bodyweightKg") private var bodyweightKg: Double = 0
     private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
 
     @State private var startDate: Date = Calendar.current.date(byAdding: .weekOfYear, value: -4, to: .now) ?? .now
@@ -43,7 +45,14 @@ struct ReportView: View {
                         .pickerStyle(.segmented)
 
                         Button {
-                            report = ReportGenerator.generate(workouts: allWorkouts, start: startDate, end: endDate, phase: phase)
+                            report = ReportGenerator.generate(
+                                workouts: allWorkouts,
+                                allExercises: allExercises,
+                                start: startDate,
+                                end: endDate,
+                                phase: phase,
+                                bodyweightKg: bodyweightKg
+                            )
                         } label: {
                             Text("Generate Report")
                                 .font(.system(size: 16, weight: .bold))
@@ -70,6 +79,51 @@ struct ReportView: View {
 private struct ReportResultsView: View {
     let report: WorkoutReport
     let weightUnit: WeightUnit
+    
+    @ViewBuilder
+    private func deltaBadge(for lift: LiftProgress) -> some View {
+        switch lift.metric {
+        case .weight:
+            if let delta = lift.weightDelta {
+                Text("\(delta >= 0 ? "+" : "")\(String(format: "%.1f", weightUnit.fromKg(delta))) \(weightUnit.label)")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(delta >= 0 ? .green : PlateColor.deadlift)
+            }
+        case .reps:
+            if let delta = lift.repsDelta {
+                Text("\(delta >= 0 ? "+" : "")\(delta) reps")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(delta >= 0 ? .green : PlateColor.deadlift)
+            }
+        case .assisted:
+            if let delta = lift.effectiveLoadDelta {
+                Text("\(delta >= 0 ? "+" : "")\(String(format: "%.1f", weightUnit.fromKg(delta))) \(weightUnit.label)")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(delta >= 0 ? .green : PlateColor.deadlift)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func progressLine(for lift: LiftProgress) -> some View {
+        switch lift.metric {
+        case .weight:
+            if let start = lift.earliestWeight, let end = lift.bestWeight {
+                Text("\(String(format: "%.1f", weightUnit.fromKg(start))) → \(String(format: "%.1f", weightUnit.fromKg(end))) \(weightUnit.label)")
+                    .font(.caption).foregroundStyle(AppTheme.textSecondary)
+            }
+        case .reps:
+            if let start = lift.earliestReps, let end = lift.bestReps {
+                Text("\(start) → \(end) reps (bodyweight)")
+                    .font(.caption).foregroundStyle(AppTheme.textSecondary)
+            }
+        case .assisted:
+            if let start = lift.earliestEffectiveLoad, let end = lift.bestEffectiveLoad {
+                Text("\(String(format: "%.1f", weightUnit.fromKg(start))) → \(String(format: "%.1f", weightUnit.fromKg(end))) \(weightUnit.label) effective load")
+                    .font(.caption).foregroundStyle(AppTheme.textSecondary)
+            }
+        }
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -94,18 +148,19 @@ private struct ReportResultsView: View {
                                 Circle().fill(PlateColor.forExercise(lift.exerciseName)).frame(width: 8, height: 8)
                                 Text(lift.exerciseName).font(.system(size: 15, weight: .semibold)).foregroundStyle(AppTheme.textPrimary)
                                 Spacer()
-                                if let delta = lift.delta {
-                                    Text("\(delta >= 0 ? "+" : "")\(String(format: "%.1f", weightUnit.fromKg(delta))) \(weightUnit.label)")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(delta >= 0 ? .green : PlateColor.deadlift)
-                                }
+                                deltaBadge(for: lift)
                             }
-                            if let start = lift.earliestTopSet, let end = lift.bestTopSet {
-                                Text("\(String(format: "%.1f", weightUnit.fromKg(start))) → \(String(format: "%.1f", weightUnit.fromKg(end))) \(weightUnit.label)")
-                                    .font(.caption).foregroundStyle(AppTheme.textSecondary)
-                            }
+                            progressLine(for: lift)
                             if let oneRM = lift.estimatedOneRepMax {
                                 Text("Est. 1RM: \(String(format: "%.1f", weightUnit.fromKg(oneRM))) \(weightUnit.label)")
+                                    .font(.caption2).foregroundStyle(AppTheme.textSecondary)
+                            }
+                            if let ratio = lift.bodyweightRatio {
+                                Text("\(String(format: "%.2f", ratio))x bodyweight")
+                                    .font(.caption2).foregroundStyle(AppTheme.textSecondary)
+                            }
+                            if lift.addedWeightSeen, let maxAdded = lift.maxAddedWeight {
+                                Text("Added weight used, up to \(String(format: "%.1f", weightUnit.fromKg(maxAdded))) \(weightUnit.label)")
                                     .font(.caption2).foregroundStyle(AppTheme.textSecondary)
                             }
                         }

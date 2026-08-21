@@ -18,20 +18,41 @@ struct WeeklyStat: Identifiable {
     let weekStart: Date
     let totalVolume: Double
     let workoutCount: Int
-    let avgEffort: Double?   // 0–10 scale, higher = harder
+    let avgEffort: Double?
 }
 
 struct LiftProgress: Identifiable {
     let id = UUID()
     let exerciseName: String
-    let earliestTopSet: Double?
-    let bestTopSet: Double?
-    let bestTopSetReps: Int?
-    let estimatedOneRepMax: Double?
+    let metric: PRMetric
 
-    var delta: Double? {
-        guard let earliest = earliestTopSet, let best = bestTopSet else { return nil }
-        return best - earliest
+    // .weight
+    var earliestWeight: Double?
+    var bestWeight: Double?
+    var estimatedOneRepMax: Double?
+    var bodyweightRatio: Double?
+
+    // .reps (bodyweight sets only)
+    var earliestReps: Int?
+    var bestReps: Int?
+    var addedWeightSeen: Bool = false
+    var maxAddedWeight: Double?
+
+    // .assisted
+    var earliestEffectiveLoad: Double?
+    var bestEffectiveLoad: Double?
+
+    var weightDelta: Double? {
+        guard let e = earliestWeight, let b = bestWeight else { return nil }
+        return b - e
+    }
+    var repsDelta: Int? {
+        guard let e = earliestReps, let b = bestReps else { return nil }
+        return b - e
+    }
+    var effectiveLoadDelta: Double? {
+        guard let e = earliestEffectiveLoad, let b = bestEffectiveLoad else { return nil }
+        return b - e
     }
 }
 
@@ -51,7 +72,7 @@ struct WorkoutReport {
 }
 
 enum ReportGenerator {
-    static func generate(workouts: [Workout], start: Date, end: Date, phase: TrainingPhase) -> WorkoutReport {
+    static func generate(workouts: [Workout], allExercises: [Exercise], start: Date, end: Date, phase: TrainingPhase, bodyweightKg: Double) -> WorkoutReport {
         let calendar = Calendar.current
         let inRange = workouts
             .filter { $0.date >= start && $0.date <= end }
@@ -81,37 +102,69 @@ enum ReportGenerator {
         let bestWeek = weeksWithEffort.min { ($0.avgEffort ?? 0) < ($1.avgEffort ?? 0) }
         let toughestWeek = weeksWithEffort.max { ($0.avgEffort ?? 0) < ($1.avgEffort ?? 0) }
 
-        let mainLiftNames = ["Deadlift", "Bench Press", "Squat"]
+        let trackedExercises = allExercises.filter { $0.prMetric != nil }
         var liftProgress: [LiftProgress] = []
-        for name in mainLiftNames {
-            let entries = inRange.flatMap { $0.exercises }.filter { $0.exercise?.name == name }
-            let sessionTopSets: [(date: Date, weight: Double, reps: Int)] = entries.compactMap { entry in
-                guard let workoutDate = entry.workout?.date,
-                      let topSet = entry.workingSets.max(by: { $0.weight < $1.weight }) else { return nil }
-                return (workoutDate, topSet.weight, topSet.reps)
-            }.sorted { $0.date < $1.date }
 
-            guard !sessionTopSets.isEmpty else { continue }
+        for exercise in trackedExercises {
+            guard let metric = exercise.prMetric else { continue }
+            let entries = inRange.flatMap { $0.exercises }.filter { $0.exercise?.name == exercise.name }
+            guard !entries.isEmpty else { continue }
 
-            let earliest = sessionTopSets.first?.weight
-            let best = sessionTopSets.max { $0.weight < $1.weight }
+            var progress = LiftProgress(exerciseName: exercise.name, metric: metric)
 
-            let best1RMCandidate = sessionTopSets.max { lhs, rhs in
-                let lhs1RM = lhs.weight * (1 + Double(lhs.reps) / 30.0)
-                let rhs1RM = rhs.weight * (1 + Double(rhs.reps) / 30.0)
-                return lhs1RM < rhs1RM
+            switch metric {
+            case .weight:
+                let sessions: [(date: Date, weight: Double, reps: Int)] = entries.compactMap { entry in
+                    guard let date = entry.workout?.date,
+                          let top = entry.workingSets.max(by: { $0.weight < $1.weight }) else { return nil }
+                    return (date, top.weight, top.reps)
+                }.sorted { $0.date < $1.date }
+                guard !sessions.isEmpty else { continue }
+
+                progress.earliestWeight = sessions.first?.weight
+                progress.bestWeight = sessions.map { $0.weight }.max()
+                let best1RM = sessions.max { lhs, rhs in
+                    (lhs.weight * (1 + Double(lhs.reps) / 30.0)) < (rhs.weight * (1 + Double(rhs.reps) / 30.0))
+                }
+                progress.estimatedOneRepMax = best1RM.map { $0.weight * (1 + Double($0.reps) / 30.0) }
+                if bodyweightKg > 0, let best = progress.bestWeight {
+                    progress.bodyweightRatio = best / bodyweightKg
+                }
+
+            case .reps:
+                let bodyweightSessions: [(date: Date, reps: Int)] = entries.compactMap { entry in
+                    guard let date = entry.workout?.date else { return nil }
+                    let bwSets = entry.workingSets.filter { $0.weight == 0 }
+                    guard let maxReps = bwSets.map({ $0.reps }).max() else { return nil }
+                    return (date, maxReps)
+                }.sorted { $0.date < $1.date }
+
+                progress.earliestReps = bodyweightSessions.first?.reps
+                progress.bestReps = bodyweightSessions.map { $0.reps }.max()
+
+                let weightedSets = entries.flatMap { $0.workingSets }.filter { $0.weight > 0 }
+                if let maxAdded = weightedSets.map({ $0.weight }).max() {
+                    progress.addedWeightSeen = true
+                    progress.maxAddedWeight = maxAdded
+                }
+                guard progress.earliestReps != nil || progress.addedWeightSeen else { continue }
+
+            case .assisted:
+                guard bodyweightKg > 0 else { continue }
+                let sessions: [(date: Date, effectiveLoad: Double)] = entries.compactMap { entry in
+                    guard let date = entry.workout?.date,
+                          let minAssistance = entry.workingSets.map({ $0.weight }).min() else { return nil }
+                    return (date, bodyweightKg - minAssistance)
+                }.sorted { $0.date < $1.date }
+                guard !sessions.isEmpty else { continue }
+
+                progress.earliestEffectiveLoad = sessions.first?.effectiveLoad
+                progress.bestEffectiveLoad = sessions.map { $0.effectiveLoad }.max()
             }
-            let estimated1RM = best1RMCandidate.map { $0.weight * (1 + Double($0.reps) / 30.0) }
 
-            liftProgress.append(LiftProgress(
-                exerciseName: name,
-                earliestTopSet: earliest,
-                bestTopSet: best?.weight,
-                bestTopSetReps: best?.reps,
-                estimatedOneRepMax: estimated1RM
-            ))
+            liftProgress.append(progress)
         }
-        
+
         let insights = buildInsights(
             phase: phase,
             liftProgress: liftProgress,
@@ -149,23 +202,55 @@ enum ReportGenerator {
             return ["No workouts logged in this period."]
         }
 
-        switch phase {
-        case .strength:
-            for lift in liftProgress {
-                if let delta = lift.delta {
-                    if delta > 0 {
-                        insights.append("\(lift.exerciseName) went from your week-1 top set up to a period-best \(String(format: "%.1f", lift.bestTopSet ?? 0)) kg — a \(String(format: "%.1f", delta)) kg improvement.")
-                    } else if delta < 0 {
-                        insights.append("\(lift.exerciseName) period-best top set (\(String(format: "%.1f", lift.bestTopSet ?? 0)) kg) came in \(String(format: "%.1f", abs(delta))) kg below your week-1 top set — worth a look.")
-                    } else {
-                        insights.append("\(lift.exerciseName) top set held steady across the period.")
+        for lift in liftProgress {
+            switch lift.metric {
+            case .weight:
+                if phase == .strength {
+                    if let delta = lift.weightDelta {
+                        if delta > 0 {
+                            insights.append("\(lift.exerciseName) went from your week-1 top set up to a period-best \(String(format: "%.1f", lift.bestWeight ?? 0)) kg — a \(String(format: "%.1f", delta)) kg improvement.")
+                        } else if delta < 0 {
+                            insights.append("\(lift.exerciseName) period-best top set (\(String(format: "%.1f", lift.bestWeight ?? 0)) kg) came in \(String(format: "%.1f", abs(delta))) kg below your week-1 top set — worth a look.")
+                        } else {
+                            insights.append("\(lift.exerciseName) top set held steady across the period.")
+                        }
+                    }
+                    if let oneRM = lift.estimatedOneRepMax {
+                        insights.append("\(lift.exerciseName) estimated 1RM (Epley): \(String(format: "%.1f", oneRM)) kg.")
+                    }
+                    if let ratio = lift.bodyweightRatio {
+                        insights.append("\(lift.exerciseName) is now \(String(format: "%.2f", ratio))x your bodyweight.")
                     }
                 }
-                if let oneRM = lift.estimatedOneRepMax {
-                    insights.append("\(lift.exerciseName) estimated 1RM (Epley): \(String(format: "%.1f", oneRM)) kg.")
+
+            case .reps:
+                if let delta = lift.repsDelta {
+                    if delta > 0 {
+                        insights.append("\(lift.exerciseName) bodyweight reps went from \(lift.earliestReps ?? 0) to a period-best \(lift.bestReps ?? 0) — up \(delta) reps.")
+                    } else if delta < 0 {
+                        insights.append("\(lift.exerciseName) period-best bodyweight reps (\(lift.bestReps ?? 0)) came in below your week-1 count (\(lift.earliestReps ?? 0)).")
+                    } else {
+                        insights.append("\(lift.exerciseName) bodyweight reps held steady at \(lift.bestReps ?? 0).")
+                    }
+                }
+                if lift.addedWeightSeen, let maxAdded = lift.maxAddedWeight {
+                    insights.append("\(lift.exerciseName): you added external weight this period, up to \(String(format: "%.1f", maxAdded)) kg.")
+                }
+
+            case .assisted:
+                if let delta = lift.effectiveLoadDelta {
+                    if delta > 0 {
+                        insights.append("\(lift.exerciseName) effective load went from \(String(format: "%.1f", lift.earliestEffectiveLoad ?? 0)) kg to a period-best \(String(format: "%.1f", lift.bestEffectiveLoad ?? 0)) kg as assistance decreased.")
+                    } else if delta < 0 {
+                        insights.append("\(lift.exerciseName) effective load dipped this period — you're using more assistance than in week 1.")
+                    } else {
+                        insights.append("\(lift.exerciseName) effective load held steady.")
+                    }
                 }
             }
-        case .bodybuilding:
+        }
+
+        if phase == .bodybuilding {
             if weeklyStats.count >= 2, let firstVolume = weeklyStats.first?.totalVolume, let lastVolume = weeklyStats.last?.totalVolume {
                 if lastVolume > firstVolume {
                     insights.append("Weekly training volume trended up — good sign for hypertrophy progression.")
