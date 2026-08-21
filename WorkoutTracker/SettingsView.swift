@@ -44,6 +44,11 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    
+                    Text("Weights are always stored in kg internally, so switching units is safe and won't affect past data.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
                 }
 
                 Section("Rest Timer") {
@@ -78,11 +83,6 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Section {
-                    Text("Weights are always stored in kg internally, so switching units is safe and won't affect past data.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
             .navigationTitle("Settings")
             .fileExporter(
