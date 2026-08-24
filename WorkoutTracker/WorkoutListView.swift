@@ -55,6 +55,15 @@ struct WorkoutListView: View {
                     )
                 } else {
                     List {
+                        if !workouts.isEmpty {
+                            Section {
+                                ConsistencyHeatmapView()
+                                    .listRowBackground(Color.clear)
+                                    .listRowSeparator(.hidden)
+                                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            }
+                        }
+                        
                         ForEach(workouts) { workout in
                             NavigationLink {
                                 WorkoutDetailView(workout: workout)
