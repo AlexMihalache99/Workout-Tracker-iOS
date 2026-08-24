@@ -14,6 +14,7 @@ struct SettingsView: View {
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
     @AppStorage("restTimerDuration") private var restTimerDuration: Int = 90
     @AppStorage("bodyweightKg") private var bodyweightKg: Double = 0
+    @AppStorage("barWeightKg") private var barWeightKg: Double = 20
     
 
     private var weightUnit: Binding<WeightUnit> {
@@ -38,6 +39,7 @@ struct SettingsView: View {
     
     //Weight
     @FocusState private var bodyweightFieldFocused: Bool
+    @FocusState private var barWeightFieldFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -107,6 +109,25 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                
+                Section("Plate Calculator") {
+                    HStack {
+                        Text("Bar Weight")
+                        Spacer()
+                        TextField("20", value: Binding(
+                            get: { weightUnit.wrappedValue.fromKg(barWeightKg) },
+                            set: { barWeightKg = weightUnit.wrappedValue.toKg($0) }
+                        ), format: .number.precision(.fractionLength(1)))
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .focused($barWeightFieldFocused)
+                        Text(weightUnit.wrappedValue.label)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text("Standard Olympic bar is 20 kg (44 lb). Adjust if you train on a different bar.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
             }
             .navigationTitle("Settings")
@@ -115,6 +136,7 @@ struct SettingsView: View {
                     Spacer()
                     Button("Done") {
                         bodyweightFieldFocused = false
+                        barWeightFieldFocused = false
                     }
                 }
             }

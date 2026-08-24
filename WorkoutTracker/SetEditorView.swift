@@ -23,6 +23,7 @@ struct SetEditorView: View {
     @State private var trackingMode: TrackingMode = .none
     @State private var rpeValue: Double = 8.0
     @State private var rirValue: Int = 2
+    @State private var showingPlateCalculator = false
     @FocusState private var focusedField: Field?
 
     private enum Field { case weight, reps }
@@ -54,13 +55,22 @@ struct SetEditorView: View {
             Form {
                 Section("Set Details") {
                     HStack {
-                        Text(prMetric == .assisted ? "Assistance (\(weightUnit.label))" : "Weight (\(weightUnit.label))")
-                        Spacer()
-                        TextField("0", text: $weightText)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .focused($focusedField, equals: .weight)
-                    }
+                            Text(prMetric == .assisted ? "Assistance (\(weightUnit.label))" : "Weight (\(weightUnit.label))")
+                            Spacer()
+                            TextField("0", text: $weightText)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .focused($focusedField, equals: .weight)
+                            if prMetric != .assisted {
+                                Button {
+                                    showingPlateCalculator = true
+                                } label: {
+                                    Image(systemName: "square.stack.3d.up")
+                                        .foregroundStyle(AppTheme.accent)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                     HStack {
                         Text("Reps")
                         Spacer()
@@ -115,6 +125,9 @@ struct SetEditorView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     focusedField = nil
                 }
+            }
+            .sheet(isPresented: $showingPlateCalculator) {
+                PlateCalculatorView(initialWeight: weightValue ?? 0)
             }
         }
     }
