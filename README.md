@@ -12,8 +12,12 @@ WorkoutTracker is an iOS strength training log built with SwiftUI and SwiftData.
 - View personal record progress with Swift Charts, styled per tracking metric.
 - Browse a large seeded exercise catalog covering main lifts, assisted/weighted bodyweight variants, and common accessories.
 - Search the exercise list when adding an exercise to a workout, or add a custom exercise inline if it isn't in the catalog yet.
+- Suggested warm-up ramp — generates a standard percentage-based warm-up (bar, 40%, 60%, 80% of a target working weight), rounded to loadable increments, with a plate breakdown per step and a one-tap "Add All" to log them as warm-up sets.
+- Plate calculator — given a target weight and configurable bar weight, shows the plates to load per side using a standard Olympic plate set, with a visual bar representation. Accessible from the set editor's weight field.
 - Repeat a past workout to start a new one pre-loaded with the same exercises, each showing a "last time" reference (weight × reps, RPE/RIR) for context — no numbers are carried over automatically.
 - Rest timer starts automatically after logging a working set, with a floating countdown bar, quick +30s adjustment, a skip option, and a local notification if the app is backgrounded. Default duration is configurable (30s–5min); individual working sets can override it via press-and-hold for heavier top sets that need longer rest.
+- Consistency tracking — a heat-map card at the top of the workout list showing training activity over a rolling ~20-week window (intensity by sets logged per day), plus current/longest weekly streaks and average sessions per week.
+- Search workout history by name or date, and filter by exercise, from the Workouts tab.
 - Generate a training report over a custom date range, with a Strength/Bodybuilding focus toggle. Reports surface metric-appropriate progress for every tracked exercise (weight delta and estimated 1RM, reps delta and added-weight milestones, or effective-load delta), plus weekly volume and best/toughest week detection based on average RPE/RIR.
 - Export all workout data as a JSON backup, and import it back in later — with a choice between replacing all data (clean restore) or merging with what's already in the app. Since there's no cloud sync, this is the safety net against reinstalls, app updates, or a lost/replaced phone.
 - Switch between kilograms and pounds in Settings while storing weights internally in kilograms.
@@ -25,7 +29,7 @@ WorkoutTracker is an iOS strength training log built with SwiftUI and SwiftData.
 - Swift Charts for personal record visualizations
 - Combine for the rest timer's observable state
 - UserNotifications for rest-complete alerts
-- AppStorage for user unit, bodyweight, and rest timer preferences
+- AppStorage for user unit, bodyweight, bar weight, and rest timer preferences
 - SwiftUI's `.fileExporter`/`.fileImporter` for JSON backup export/import
 ## Project Structure
 | File | Purpose |
@@ -36,9 +40,9 @@ WorkoutTracker is an iOS strength training log built with SwiftUI and SwiftData.
 | `Exercise.swift` | Exercise model with category and `prMetric` (weight / reps / assisted / untracked). |
 | `ExerciseEntry.swift` | Links exercises to workouts and computes exercise totals, including sorted (warm-up first) set ordering and a transient "last time" display label used by Repeat Workout. |
 | `SetEntry.swift` | Set model for warm-up and working sets. |
-| `WorkoutListView.swift` | Workout history, navigation into workout details, and the Repeat Workout swipe action. |
-| `NewWorkoutView.swift` | Workout creation flow; workout is only persisted on Save. Hosts the rest timer bar and per-set rest duration override. |
-| `SetEditorView.swift` | Set entry form, with locale-aware decimal parsing (handles both `.` and `,`). Labels the weight field "Assistance" instead of "Weight" for assisted-tracked exercises. |
+| `WorkoutListView.swift` | Workout history with search (by name/date) and exercise filter, the consistency heat-map card, navigation into workout details, and the Repeat Workout swipe action. |
+| `NewWorkoutView.swift` | Workout creation flow; workout is only persisted on Save. Hosts the rest timer bar, per-set rest duration override, and the warm-up suggestion entry point. |
+| `SetEditorView.swift` | Set entry form, with locale-aware decimal parsing (handles both `.` and `,`) and a plate calculator shortcut next to the weight field. Labels the weight field "Assistance" instead of "Weight" for assisted-tracked exercises. |
 | `ExercisePickerView.swift` | Searchable exercise selection flow with inline "add custom exercise." |
 | `ExerciseDetailView.swift` | Exercise-specific history/details, plus the PR Tracking picker (Not Tracked / Weight / Reps / Assisted) and the corresponding personal-record display. |
 | `PRDashboardView.swift` | Personal record cards and progress charts, with a dedicated card type per tracking metric (weight, reps, assisted/effective-load). |
@@ -46,9 +50,15 @@ WorkoutTracker is an iOS strength training log built with SwiftUI and SwiftData.
 | `ReportView.swift` | Report generation UI — period and focus selection, results display with metric-aware progress lines and delta badges. |
 | `RestTimerManager.swift` | Observable countdown timer, backed by an end-date for accuracy, plus local notification scheduling for rest completion. |
 | `RestTimerBar.swift` | Floating themed rest timer UI — progress ring, countdown, +30s, and skip. |
+| `PlateCalculator.swift` | Pure calculation logic for plate breakdowns — greedy largest-plate-first algorithm against a standard Olympic plate set, given a target weight and bar weight. |
+| `PlateCalculatorView.swift` | Plate calculator UI — target weight entry, visual bar representation, and per-side plate breakdown. |
+| `WarmupSuggester.swift` | Pure calculation logic generating a standard percentage-based warm-up ramp (bar/40%/60%/80%) from a target working weight, rounded to loadable plate increments. |
+| `WarmupSuggestionView.swift` | Warm-up suggestion UI — target weight entry (prefilled from the session's top working set if available), suggested ramp with inline plate breakdowns, and one-tap "Add All". |
+| `ConsistencyCalculator.swift` | Pure calculation logic for the consistency heat-map — daily set counts over a rolling window, current/longest weekly streaks, and average sessions per week (normalized to weeks actually logged, not always the full window). |
+| `ConsistencyHeatmapView.swift` | Heat-map card UI — scrollable grid of daily activity squares plus streak and average stats. |
 | `BackupModels.swift` | Versioned, Codable backup format and `BackupManager`, which builds/encodes a backup from the store and decodes/imports one back in (Replace or Merge). |
 | `BackupDocument.swift` | `FileDocument` wrapper so SwiftUI's `.fileExporter` can save the backup JSON. |
-| `SettingsView.swift` | Unit preference, current bodyweight, default rest timer duration, and backup export/import. |
+| `SettingsView.swift` | Unit preference, current bodyweight, bar weight, default rest timer duration, and backup export/import. |
 | `ExerciseSeeder.swift` | Seeds the default exercise catalog on first launch, including default PR-metric assignments. Also runs a one-time migration (`migratePRMetricIfNeeded`) that derives `prMetric` for installs seeded before the field existed, without overwriting manual tracking choices made afterward. |
 | `WeightUnit.swift` | Unit conversion helpers. |
 | `Theme.swift` | Shared colors, typography, and visual styling. |
@@ -76,10 +86,18 @@ Each exercise can be set to one of three tracking metrics (or left untracked) fr
 - **Reps** — for bodyweight movements. Only sets logged at 0 kg count toward the reps PR, since reps at different added weights aren't directly comparable. If a set with added weight is logged, that's called out separately in reports as a milestone rather than folded into the reps trend.
 - **Assisted** — for machine-assisted movements. The weight field is relabeled "Assistance," and the app computes effective load moved as bodyweight − assistance. Progress means less assistance over time, so PR is the session with the least assistance (highest effective load). Requires bodyweight to be set in Settings.
 Bodyweight is entered once in Settings (unit-aware, stored internally in kg) and is used both for the bodyweight-ratio line on weight-tracked lifts and as the basis for all effective-load calculations on assisted-tracked exercises.
+## Plate Calculator & Warm-up Suggester
+- **Plate Calculator** takes a target weight and the configured bar weight (default 20 kg, adjustable in Settings) and computes which plates to load per side from a standard Olympic set (25/20/15/10/5/2.5/1.25 kg), using a greedy largest-plate-first algorithm. If the exact target isn't achievable with standard plates, it shows the closest achievable total instead. Opened from a button next to the weight field in the set editor (hidden for assisted-tracked exercises, since that number represents machine assistance rather than barbell load).
+- **Warm-up Suggester** generates a standard ramp — bar × 8, 40% × 5, 60% × 3, 80% × 2 — from a target working weight (prefilled from the day's top working set if one's already logged), with each step rounded to a loadable 2.5 kg increment and shown with its own plate breakdown. "Add All" logs the full ramp as warm-up sets in one tap, ordered correctly ahead of working sets.
+Both features share the same bar-weight setting and plate-rounding logic, and both convert their display to whichever unit (kg/lb) is currently selected while keeping the underlying plate math in real kg plate sizes.
 ## Repeat Workout
 Swiping a past workout (leading edge) offers **Repeat**, which opens a new workout pre-loaded with the same exercises in the same order. Only the exercise list is copied — weight, reps, and RPE/RIR are always left blank so each session's numbers are entered fresh. Each exercise shows a "Last time: weight × reps, RPE/RIR" line (pulled from that exercise's heaviest working set in the source workout) as reference while logging today's numbers.
 ## Rest Timer
 Logging a working set (not a warm-up) automatically starts a rest countdown, shown as a floating bar above the tab bar for the duration of the rest period. The bar shows a progress ring, time remaining, a +30s button, and a skip option. A local notification is scheduled in parallel so rest completion is still signaled if the phone is locked or the app is backgrounded. The default duration is set in Settings (30s–5min); pressing and holding "Working Set" on a given exercise offers one-off overrides (90s/2min/3min/5min) for sets that need more or less rest than the default, such as a heavy top set. The timer is cancelled on Discard, Save, or leaving the workout screen, so no stray notification fires after a workout is finished or abandoned.
+## Consistency Tracking
+The Workouts tab opens with a heat-map card showing daily training activity over a rolling ~20-week window, horizontally scrollable to see further back. Each day's square intensity reflects how many working sets were logged that day, not just whether you trained. Alongside the grid: your current weekly streak (weeks in a row with at least one workout, shown with a flame while active), longest streak on record, and average sessions per week — normalized to however many weeks you've actually been logging, so it doesn't understate consistency for newer histories shorter than the full window.
+## Search & Filter
+The Workouts tab supports searching by workout name or formatted date, and filtering the list down to workouts containing a specific exercise (via a menu listing only exercises you've actually used). Search and filter combine, and a dismissible chip shows the active exercise filter. A dedicated empty state distinguishes "no results for this search/filter" from "no workouts logged yet."
 ## Reports
 Reports are generated on demand for any date range, using only the sets already logged — no separate data entry required. Every exercise with PR tracking enabled gets a progress card, styled to its metric:
 - **Weight-tracked exercises**: top-set weight progression (first session vs. period-best), estimated one-rep max, and bodyweight ratio if set.
