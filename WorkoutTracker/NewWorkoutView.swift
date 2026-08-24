@@ -19,6 +19,9 @@ struct NewWorkoutView: View {
     @State private var setEditorTarget: SetEditorTarget?
     @State private var showingDiscardConfirmation = false
     @State private var pendingRestDuration: Int? = nil
+    @State private var warmupSuggestionEntry: ExerciseEntry?
+    
+    
     @StateObject private var restTimer = RestTimerManager()
     @AppStorage("restTimerDuration") private var restTimerDuration: Int = 90
     @FocusState private var nameFieldFocused: Bool
@@ -50,13 +53,27 @@ struct NewWorkoutView: View {
                             deleteSets(from: entry, at: offsets)
                         }
 
-                        HStack {
+                        HStack(spacing: 8) {
+                            Button {
+                                warmupSuggestionEntry = entry
+                            } label: {
+                                Image(systemName: "wand.and.stars")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
+                            .fixedSize()
+
                             Button {
                                 setEditorTarget = SetEditorTarget(entry: entry, type: .warmup)
                             } label: {
-                                Label("Warm-up", systemImage: "flame")
+                                Text("Warm-up")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                                    .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
+                            .controlSize(.regular)
 
                             Menu {
                                 Button("90s rest") { pendingRestDuration = 90 }
@@ -66,11 +83,16 @@ struct NewWorkoutView: View {
                                 Divider()
                                 Button("Use default (\(restTimerDuration)s)") { pendingRestDuration = nil }
                             } label: {
-                                Label("Working Set", systemImage: "plus.circle")
+                                Text("Working Set")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                                    .frame(maxWidth: .infinity)
                             } primaryAction: {
                                 setEditorTarget = SetEditorTarget(entry: entry, type: .working)
                             }
                             .buttonStyle(.borderedProminent)
+                            .controlSize(.regular)
                         }
                     } header: {
                         VStack(alignment: .leading, spacing: 2) {
@@ -149,6 +171,13 @@ struct NewWorkoutView: View {
                     },
                     prMetric: target.entry.exercise?.prMetric
                 )
+            }
+            .sheet(item: $warmupSuggestionEntry) { entry in
+                WarmupSuggestionView(entry: entry) { newSets in
+                    for set in newSets {
+                        entry.sets.append(set)
+                    }
+                }
             }
             .overlay {
                 if showingDiscardConfirmation {
