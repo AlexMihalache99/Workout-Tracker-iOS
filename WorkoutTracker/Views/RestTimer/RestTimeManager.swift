@@ -17,16 +17,27 @@ final class RestTimerManager: ObservableObject {
     @Published var totalSeconds: Int = 90
 
     private var endDate: Date?
+    private var startDate: Date?
     private var timer: Timer?
     private let notificationID = "restTimerComplete"
 
     func start(duration: Int) {
-        cancel()
+        cancel(endsLiveActivity: false)
+        let now = Date()
+        let endDate = now.addingTimeInterval(TimeInterval(duration))
         totalSeconds = duration
         remainingSeconds = duration
-        endDate = Date().addingTimeInterval(TimeInterval(duration))
+        startDate = now
+        self.endDate = endDate
         isActive = true
         scheduleNotification(after: duration)
+        Task {
+            await RestTimerLiveActivityController.start(
+                startedAt: now,
+                endsAt: endDate,
+                totalSeconds: duration
+            )
+        }
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.tick()
@@ -41,6 +52,15 @@ final class RestTimerManager: ObservableObject {
         totalSeconds += seconds
         remainingSeconds = max(0, Int(newEnd.timeIntervalSinceNow.rounded()))
         rescheduleNotification()
+        if let startDate {
+            Task {
+                await RestTimerLiveActivityController.update(
+                    startedAt: startDate,
+                    endsAt: newEnd,
+                    totalSeconds: totalSeconds
+                )
+            }
+        }
     }
 
     func skip() {
@@ -48,11 +68,21 @@ final class RestTimerManager: ObservableObject {
     }
 
     func cancel() {
+        cancel(endsLiveActivity: true)
+    }
+
+    private func cancel(endsLiveActivity: Bool) {
         timer?.invalidate()
         timer = nil
         isActive = false
+        startDate = nil
         endDate = nil
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [notificationID])
+        if endsLiveActivity {
+            Task {
+                await RestTimerLiveActivityController.end()
+            }
+        }
     }
 
     private func tick() {
