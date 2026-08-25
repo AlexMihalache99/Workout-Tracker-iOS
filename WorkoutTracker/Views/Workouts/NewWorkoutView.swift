@@ -21,11 +21,14 @@ struct NewWorkoutView: View {
     @State private var pendingRestDuration: Int? = nil
     @State private var warmupSuggestionEntry: ExerciseEntry?
     @State private var isPairingMode = false
+    @State private var isSavingWorkout = false
     @State private var selectedForPairing: Set<PersistentIdentifier> = []
 
     @StateObject private var restTimer = RestTimerManager()
     @AppStorage("restTimerDuration") private var restTimerDuration: Int = 90
     @FocusState private var nameFieldFocused: Bool
+    
+    @AppStorage("healthSyncEnabled") private var healthSyncEnabled: Bool = false
 
     private struct SetEditorTarget: Identifiable {
         let id = UUID()
@@ -113,13 +116,9 @@ struct NewWorkoutView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        modelContext.insert(workout)
-                        try? modelContext.save()
-                        UINotificationFeedbackGenerator().notificationOccurred(.success)
-                        restTimer.cancel()
-                        dismiss()
+                        Task { await saveWorkout() }
                     }
-                    .disabled(workout.exercises.isEmpty || isPairingMode)
+                    .disabled(workout.exercises.isEmpty || isPairingMode || isSavingWorkout)
                 }
             }
             .sheet(isPresented: $showingExercisePicker) {
@@ -134,15 +133,20 @@ struct NewWorkoutView: View {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }) { target in
                 let nextNumber = target.entry.sets.filter { $0.setType == target.type }.count + 1
-                SetEditorView(setType: target.type, nextSetNumber: nextNumber, prMetric: target.entry.exercise?.prMetric) { newSet in
-                    newSet.exerciseEntry = target.entry
-                    target.entry.sets.append(newSet)
-                    if target.type == .working {
-                        if shouldStartRestTimer(after: target.entry) {
-                            restTimer.start(duration: pendingRestDuration ?? restTimerDuration)
+                SetEditorView(
+                    setType: target.type,
+                    nextSetNumber: nextNumber,
+                    onSave: { newSet in
+                        newSet.exerciseEntry = target.entry
+                        target.entry.sets.append(newSet)
+                        if target.type == .working {
+                            if shouldStartRestTimer(after: target.entry) {
+                                restTimer.start(duration: pendingRestDuration ?? restTimerDuration)
+                            }
                         }
-                    }
-                }
+                    },
+                    prMetric: target.entry.exercise?.prMetric
+                )
             }
             .sheet(item: $warmupSuggestionEntry) { entry in
                 WarmupSuggestionView(entry: entry) { newSets in
@@ -185,6 +189,33 @@ struct NewWorkoutView: View {
                 restTimer.cancel()
             }
         }
+    }
+
+    private func saveWorkout() async {
+        guard !isSavingWorkout else { return }
+
+        isSavingWorkout = true
+        defer { isSavingWorkout = false }
+
+        modelContext.insert(workout)
+        try? modelContext.save()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        restTimer.cancel()
+
+        if healthSyncEnabled {
+            let sets = workout.totalWorkingSets
+            let volume = workout.totalVolume
+            let start = workout.date
+            let end = workout.date.addingTimeInterval(TimeInterval(sets * 180))
+
+            do {
+                try await HealthKitManager.shared.saveWorkout(start: start, end: end, workingSets: sets, totalVolumeKg: volume)
+            } catch {
+                print("Health sync failed: \(error.localizedDescription)")
+            }
+        }
+
+        dismiss()
     }
 
     private func shouldStartRestTimer(after entry: ExerciseEntry) -> Bool {

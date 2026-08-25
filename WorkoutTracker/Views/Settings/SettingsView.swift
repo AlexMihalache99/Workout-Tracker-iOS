@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import HealthKit
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
@@ -15,6 +16,7 @@ struct SettingsView: View {
     @AppStorage("restTimerDuration") private var restTimerDuration: Int = 90
     @AppStorage("bodyweightKg") private var bodyweightKg: Double = 0
     @AppStorage("barWeightKg") private var barWeightKg: Double = 20
+    @AppStorage("healthSyncEnabled") private var healthSyncEnabled: Bool = false
     
 
     private var weightUnit: Binding<WeightUnit> {
@@ -40,6 +42,10 @@ struct SettingsView: View {
     //Weight
     @FocusState private var bodyweightFieldFocused: Bool
     @FocusState private var barWeightFieldFocused: Bool
+    
+    //HealthKit
+    @State private var isSyncingBodyweight = false
+    @State private var healthSyncMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -77,7 +83,52 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                
+                
+                Section("Apple Health") {
+                    Toggle("Sync with Apple Health", isOn: $healthSyncEnabled)
+                        .onChange(of: healthSyncEnabled) { _, newValue in
+                            if newValue {
+                                Task {
+                                    do {
+                                        try await HealthKitManager.shared.requestAuthorization()
+                                        if HealthKitManager.shared.hasWorkoutWriteAuthorization {
+                                            feedbackIsError = false
+                                            feedbackMessage = "Health sync enabled."
+                                        } else {
+                                            healthSyncEnabled = false
+                                            feedbackIsError = true
+                                            feedbackMessage = "Health permission wasn't granted for workouts. You can enable it in Settings → Privacy & Security → Health → WorkoutTracker."
+                                        }
+                                    } catch {
+                                        healthSyncEnabled = false
+                                        feedbackIsError = true
+                                        feedbackMessage = "Couldn't request Health access: \(error.localizedDescription)"
+                                    }
+                                }
+                            }
+                        }
 
+                    if healthSyncEnabled {
+                        Button {
+                            Task { await syncBodyweightFromHealth() }
+                        } label: {
+                            HStack {
+                                Text("Sync Bodyweight from Health")
+                                Spacer()
+                                if isSyncingBodyweight {
+                                    ProgressView()
+                                }
+                            }
+                        }
+                        .disabled(isSyncingBodyweight)
+                    }
+
+                    Text("When enabled, completed workouts are logged to Health as strength training, and you can pull your latest bodyweight from Health.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
                 Section("Rest Timer") {
                     Stepper(value: $restTimerDuration, in: 30...300, step: 15) {
                         HStack {
@@ -247,5 +298,19 @@ struct SettingsView: View {
         let minutes = seconds / 60
         let secs = seconds % 60
         return secs == 0 ? "\(minutes) min" : "\(minutes)m \(secs)s"
+    }
+    
+    private func syncBodyweightFromHealth() async {
+        isSyncingBodyweight = true
+        defer { isSyncingBodyweight = false }
+
+        if let kg = await HealthKitManager.shared.fetchLatestBodyweightKg() {
+            bodyweightKg = kg
+            feedbackIsError = false
+            feedbackMessage = "Bodyweight updated from Health."
+        } else {
+            feedbackIsError = true
+            feedbackMessage = "No bodyweight data found in Health."
+        }
     }
 }
