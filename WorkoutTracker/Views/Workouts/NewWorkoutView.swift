@@ -95,7 +95,7 @@ struct NewWorkoutView: View {
                             .controlSize(.regular)
                         }
                     } header: {
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Text(entry.exercise?.name ?? "Unknown Exercise")
                                 Spacer()
@@ -112,6 +112,18 @@ struct NewWorkoutView: View {
                                     .font(.caption2)
                                     .foregroundStyle(AppTheme.textSecondary)
                                     .textCase(nil)
+                            }
+                            if let notes = entry.exercise?.notes, !notes.isEmpty {
+                                HStack(alignment: .top, spacing: 4) {
+                                    Image(systemName: "lightbulb.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(PlateColor.squat)
+                                    Text(notes)
+                                        .font(.caption2)
+                                        .foregroundStyle(AppTheme.textSecondary)
+                                        .textCase(nil)
+                                }
+                                .padding(.top, 2)
                             }
                         }
                     }

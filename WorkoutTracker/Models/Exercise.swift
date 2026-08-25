@@ -20,11 +20,13 @@ final class Exercise {
     var category: String
     var isMainLift: Bool
     var prMetric: PRMetric?
+    var notes: String?
 
-    init(name: String, category: String, isMainLift: Bool = false, prMetric: PRMetric? = nil) {
+    init(name: String, category: String, isMainLift: Bool = false, prMetric: PRMetric? = nil, notes: String? = nil) {
         self.name = name
         self.category = category
         self.isMainLift = isMainLift
         self.prMetric = prMetric
+        self.notes = notes
     }
 }

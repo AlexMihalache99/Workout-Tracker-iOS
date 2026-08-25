@@ -23,6 +23,9 @@ struct ExerciseDetailView: View {
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
     @AppStorage("bodyweightKg") private var bodyweightKg: Double = 0
     private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
+    
+    @State private var notesText: String = ""
+    @FocusState private var notesFieldFocused: Bool
 
     init(exercise: Exercise) {
         self.exercise = exercise
@@ -98,6 +101,12 @@ struct ExerciseDetailView: View {
                 .pickerStyle(.segmented)
             }
             
+            Section("Form Cues & Notes") {
+                TextField("e.g. Brace core, chest up, bar over midfoot...", text: $notesText, axis: .vertical)
+                    .lineLimit(3...8)
+                    .focused($notesFieldFocused)
+            }
+            
             if exercise.prMetric == .weight, let pr = personalRecordWeight {
                 Section("Personal Record") {
                     Text("\(weightUnit.fromKg(pr), specifier: "%.1f") \(weightUnit.label)")
@@ -148,5 +157,16 @@ struct ExerciseDetailView: View {
         .scrollContentBackground(.hidden)
         .background(AppTheme.background)
         .listRowBackground(AppTheme.surface)
+        .onAppear {
+            notesText = exercise.notes ?? ""
+        }
+        .onChange(of: notesFieldFocused) { _, isFocused in
+            if !isFocused {
+                exercise.notes = notesText.isEmpty ? nil : notesText
+            }
+        }
+        .onDisappear {
+            exercise.notes = notesText.isEmpty ? nil : notesText
+        }
     }
 }
