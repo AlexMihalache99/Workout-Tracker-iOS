@@ -32,37 +32,54 @@ WorkoutTracker is an iOS strength training log built with SwiftUI and SwiftData.
 - AppStorage for user unit, bodyweight, bar weight, and rest timer preferences
 - SwiftUI's `.fileExporter`/`.fileImporter` for JSON backup export/import
 ## Project Structure
-| File | Purpose |
-| --- | --- |
-| `WorkoutTrackerApp.swift` | App entry point, SwiftData model container setup, and notification authorization request. |
-| `ContentView.swift` | Main tab layout for Workouts, Report, PRs, Exercises, and Settings. Runs one-time PR-metric migration on launch. |
-| `Workout.swift` | Workout model and computed workout summaries. |
-| `Exercise.swift` | Exercise model with category and `prMetric` (weight / reps / assisted / untracked). |
-| `ExerciseEntry.swift` | Links exercises to workouts and computes exercise totals, including sorted (warm-up first) set ordering and a transient "last time" display label used by Repeat Workout. |
-| `SetEntry.swift` | Set model for warm-up and working sets. |
-| `WorkoutListView.swift` | Workout history with search (by name/date) and exercise filter, the consistency heat-map card, navigation into workout details, and the Repeat Workout swipe action. |
-| `NewWorkoutView.swift` | Workout creation flow; workout is only persisted on Save. Hosts the rest timer bar, per-set rest duration override, and the warm-up suggestion entry point. |
-| `SetEditorView.swift` | Set entry form, with locale-aware decimal parsing (handles both `.` and `,`) and a plate calculator shortcut next to the weight field. Labels the weight field "Assistance" instead of "Weight" for assisted-tracked exercises. |
-| `ExercisePickerView.swift` | Searchable exercise selection flow with inline "add custom exercise." |
-| `ExerciseDetailView.swift` | Exercise-specific history/details, plus the PR Tracking picker (Not Tracked / Weight / Reps / Assisted) and the corresponding personal-record display. |
-| `PRDashboardView.swift` | Personal record cards and progress charts, with a dedicated card type per tracking metric (weight, reps, assisted/effective-load). |
-| `ReportGenerator.swift` | Pure calculation layer for training reports — period totals, weekly breakdown, per-exercise progress across all three PR metrics, and phase-based insights. |
-| `ReportView.swift` | Report generation UI — period and focus selection, results display with metric-aware progress lines and delta badges. |
-| `RestTimerManager.swift` | Observable countdown timer, backed by an end-date for accuracy, plus local notification scheduling for rest completion. |
-| `RestTimerBar.swift` | Floating themed rest timer UI — progress ring, countdown, +30s, and skip. |
-| `PlateCalculator.swift` | Pure calculation logic for plate breakdowns — greedy largest-plate-first algorithm against a standard Olympic plate set, given a target weight and bar weight. |
-| `PlateCalculatorView.swift` | Plate calculator UI — target weight entry, visual bar representation, and per-side plate breakdown. |
-| `WarmupSuggester.swift` | Pure calculation logic generating a standard percentage-based warm-up ramp (bar/40%/60%/80%) from a target working weight, rounded to loadable plate increments. |
-| `WarmupSuggestionView.swift` | Warm-up suggestion UI — target weight entry (prefilled from the session's top working set if available), suggested ramp with inline plate breakdowns, and one-tap "Add All". |
-| `ConsistencyCalculator.swift` | Pure calculation logic for the consistency heat-map — daily set counts over a rolling window, current/longest weekly streaks, and average sessions per week (normalized to weeks actually logged, not always the full window). |
-| `ConsistencyHeatmapView.swift` | Heat-map card UI — scrollable grid of daily activity squares plus streak and average stats. |
-| `BackupModels.swift` | Versioned, Codable backup format and `BackupManager`, which builds/encodes a backup from the store and decodes/imports one back in (Replace or Merge). |
-| `BackupDocument.swift` | `FileDocument` wrapper so SwiftUI's `.fileExporter` can save the backup JSON. |
-| `SettingsView.swift` | Unit preference, current bodyweight, bar weight, default rest timer duration, and backup export/import. |
-| `ExerciseSeeder.swift` | Seeds the default exercise catalog on first launch, including default PR-metric assignments. Also runs a one-time migration (`migratePRMetricIfNeeded`) that derives `prMetric` for installs seeded before the field existed, without overwriting manual tracking choices made afterward. |
-| `WeightUnit.swift` | Unit conversion helpers. |
-| `Theme.swift` | Shared colors, typography, and visual styling. |
-| `DeleteConfirmationOverlay.swift` | Themed confirmation overlay for deleting or discarding workouts. |
+```
+WorkoutTracker/
+├─ WorkoutTrackerApp.swift      — app entry point, SwiftData container, notification auth
+├─ ContentView.swift             — root TabView, one-time PR-metric migration on launch
+├─ Theme.swift                   — shared colors, typography, visual styling
+├─ ExerciseSeeder.swift          — seeds default exercise catalog + PR-metric migration
+│
+├─ Models/
+│  ├─ Workout.swift              — Workout model + computed summaries
+│  ├─ Exercise.swift             — Exercise model, category, prMetric
+│  ├─ ExerciseEntry.swift        — links exercises to workouts, sorted sets, "last time" label
+│  ├─ SetEntry.swift             — warm-up/working set model
+│  └─ WeightUnit.swift           — kg/lb conversion helpers
+│
+├─ Views/
+│  ├─ Workouts/
+│  │  ├─ WorkoutListView.swift       — history, search/filter, heat-map, Repeat
+│  │  ├─ NewWorkoutView.swift        — workout creation, rest timer, warm-up suggestion entry
+│  │  ├─ WorkoutDetailView.swift     — view/edit a saved workout
+│  │  └─ SetEditorView.swift         — set entry form, plate calculator shortcut
+│  ├─ Exercises/
+│  │  ├─ ExercisePickerView.swift    — searchable picker, inline custom-exercise add
+│  │  └─ ExerciseDetailView.swift    — history, PR Tracking picker, personal record
+│  ├─ PR/
+│  │  └─ PRDashboardView.swift       — PR cards per tracking metric, with charts
+│  ├─ Reports/
+│  │  ├─ ReportGenerator.swift       — pure calculation layer for training reports
+│  │  └─ ReportView.swift            — report period/focus selection, results display
+│  ├─ RestTimer/
+│  │  ├─ RestTimerManager.swift      — observable countdown, local notification scheduling
+│  │  └─ RestTimerBar.swift          — floating rest timer UI
+│  ├─ PlateCalculator/
+│  │  ├─ PlateCalculator.swift       — plate breakdown calculation logic
+│  │  ├─ PlateCalculatorView.swift   — plate calculator UI
+│  │  ├─ WarmupSuggester.swift       — warm-up ramp calculation logic
+│  │  └─ WarmupSuggestionView.swift  — warm-up suggestion UI
+│  ├─ Consistency/
+│  │  ├─ ConsistencyCalculator.swift — heat-map/streak calculation logic
+│  │  └─ ConsistencyHeatmapView.swift — heat-map card UI
+│  ├─ Settings/
+│  │  └─ SettingsView.swift          — units, bodyweight, bar weight, rest timer, backup
+│  └─ Shared/
+│     └─ DeleteConfirmationOverlay.swift — themed delete/discard confirmation
+│
+└─ Backup/
+   ├─ BackupModels.swift          — versioned Codable backup format + BackupManager
+   └─ BackupDocument.swift        — FileDocument wrapper for .fileExporter
+```
 ## Getting Started
 1. Open `WorkoutTracker.xcodeproj` in Xcode.
 2. Select the `WorkoutTracker` scheme.
