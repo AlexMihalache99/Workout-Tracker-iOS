@@ -199,8 +199,12 @@ private struct ReportResultsView: View {
                     Text("INSIGHTS").font(.system(size: 12, weight: .bold)).tracking(1.2).foregroundStyle(AppTheme.textSecondary)
                     ForEach(report.insights, id: \.self) { insight in
                         HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: "sparkle").foregroundStyle(AppTheme.accent).font(.caption)
-                            Text(insight).font(.system(size: 14)).foregroundStyle(AppTheme.textPrimary)
+                            Image(systemName: insight.hasPrefix("⚠️") ? "exclamationmark.triangle.fill" : "sparkle")
+                                .foregroundStyle(insight.hasPrefix("⚠️") ? PlateColor.deadlift : AppTheme.accent)
+                                .font(.caption)
+                            Text(insight.replacingOccurrences(of: "⚠️ ", with: ""))
+                                .font(.system(size: 14))
+                                .foregroundStyle(AppTheme.textPrimary)
                         }
                     }
                 }
