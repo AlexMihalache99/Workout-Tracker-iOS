@@ -20,8 +20,9 @@ struct NewWorkoutView: View {
     @State private var showingDiscardConfirmation = false
     @State private var pendingRestDuration: Int? = nil
     @State private var warmupSuggestionEntry: ExerciseEntry?
-    
-    
+    @State private var isPairingMode = false
+    @State private var selectedForPairing: Set<PersistentIdentifier> = []
+
     @StateObject private var restTimer = RestTimerManager()
     @AppStorage("restTimerDuration") private var restTimerDuration: Int = 90
     @FocusState private var nameFieldFocused: Bool
@@ -30,6 +31,24 @@ struct NewWorkoutView: View {
         let id = UUID()
         let entry: ExerciseEntry
         let type: SetType
+    }
+
+    private var displayGroups: [[ExerciseEntry]] {
+        var result: [[ExerciseEntry]] = []
+        var seen: Set<PersistentIdentifier> = []
+
+        for entry in workout.exercises {
+            if seen.contains(entry.persistentModelID) { continue }
+            if let groupID = entry.supersetGroupID {
+                let partners = workout.exercises.filter { $0.supersetGroupID == groupID }
+                result.append(partners)
+                partners.forEach { seen.insert($0.persistentModelID) }
+            } else {
+                result.append([entry])
+                seen.insert(entry.persistentModelID)
+            }
+        }
+        return result
     }
 
     var body: some View {
@@ -44,88 +63,11 @@ struct NewWorkoutView: View {
                     DatePicker("Date", selection: $workout.date, displayedComponents: [.date, .hourAndMinute])
                 }
 
-                ForEach(workout.exercises) { entry in
-                    Section {
-                        ForEach(entry.sortedSets) { set in
-                            SetRow(set: set)
-                        }
-                        .onDelete { offsets in
-                            deleteSets(from: entry, at: offsets)
-                        }
-
-                        HStack(spacing: 8) {
-                            Button {
-                                warmupSuggestionEntry = entry
-                            } label: {
-                                Image(systemName: "wand.and.stars")
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.regular)
-                            .fixedSize()
-
-                            Button {
-                                setEditorTarget = SetEditorTarget(entry: entry, type: .warmup)
-                            } label: {
-                                Text("Warm-up")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.7)
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.regular)
-
-                            Menu {
-                                Button("90s rest") { pendingRestDuration = 90 }
-                                Button("2 min rest") { pendingRestDuration = 120 }
-                                Button("3 min rest") { pendingRestDuration = 180 }
-                                Button("5 min rest") { pendingRestDuration = 300 }
-                                Divider()
-                                Button("Use default (\(restTimerDuration)s)") { pendingRestDuration = nil }
-                            } label: {
-                                Text("Working Set")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.7)
-                                    .frame(maxWidth: .infinity)
-                            } primaryAction: {
-                                setEditorTarget = SetEditorTarget(entry: entry, type: .working)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.regular)
-                        }
-                    } header: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(entry.exercise?.name ?? "Unknown Exercise")
-                                Spacer()
-                                Button {
-                                    deleteExerciseEntry(entry)
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .foregroundStyle(PlateColor.deadlift)
-                                        .font(.caption)
-                                }
-                            }
-                            if let lastLabel = entry.lastSessionLabel {
-                                Text("Last time: \(lastLabel)")
-                                    .font(.caption2)
-                                    .foregroundStyle(AppTheme.textSecondary)
-                                    .textCase(nil)
-                            }
-                            if let notes = entry.exercise?.notes, !notes.isEmpty {
-                                HStack(alignment: .top, spacing: 4) {
-                                    Image(systemName: "lightbulb.fill")
-                                        .font(.caption2)
-                                        .foregroundStyle(PlateColor.squat)
-                                    Text(notes)
-                                        .font(.caption2)
-                                        .foregroundStyle(AppTheme.textSecondary)
-                                        .textCase(nil)
-                                }
-                                .padding(.top, 2)
-                            }
-                        }
+                ForEach(Array(displayGroups.enumerated()), id: \.offset) { _, group in
+                    if group.count == 2 {
+                        supersetSection(group)
+                    } else if let entry = group.first {
+                        exerciseSection(entry)
                     }
                 }
 
@@ -138,13 +80,34 @@ struct NewWorkoutView: View {
             .navigationTitle("New Workout")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if isPairingMode {
+                        Button(selectedForPairing.count == 2 ? "Confirm" : "Select 2") {
+                            confirmPairing()
+                        }
+                        .disabled(selectedForPairing.count != 2)
+                    } else if workout.exercises.count >= 2 {
+                        Button {
+                            isPairingMode = true
+                        } label: {
+                            Image(systemName: "link")
+                        }
+                    }
+                }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Discard") {
-                        if workout.exercises.isEmpty {
-                            restTimer.cancel()
-                            dismiss()
-                        } else {
-                            showingDiscardConfirmation = true
+                    if isPairingMode {
+                        Button("Cancel") {
+                            isPairingMode = false
+                            selectedForPairing.removeAll()
+                        }
+                    } else {
+                        Button("Discard") {
+                            if workout.exercises.isEmpty {
+                                restTimer.cancel()
+                                dismiss()
+                            } else {
+                                showingDiscardConfirmation = true
+                            }
                         }
                     }
                 }
@@ -156,7 +119,7 @@ struct NewWorkoutView: View {
                         restTimer.cancel()
                         dismiss()
                     }
-                    .disabled(workout.exercises.isEmpty)
+                    .disabled(workout.exercises.isEmpty || isPairingMode)
                 }
             }
             .sheet(isPresented: $showingExercisePicker) {
@@ -171,18 +134,15 @@ struct NewWorkoutView: View {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }) { target in
                 let nextNumber = target.entry.sets.filter { $0.setType == target.type }.count + 1
-                SetEditorView(
-                    setType: target.type,
-                    nextSetNumber: nextNumber,
-                    onSave: { newSet in
-                        newSet.exerciseEntry = target.entry
-                        target.entry.sets.append(newSet)
-                        if target.type == .working {
+                SetEditorView(setType: target.type, nextSetNumber: nextNumber, prMetric: target.entry.exercise?.prMetric) { newSet in
+                    newSet.exerciseEntry = target.entry
+                    target.entry.sets.append(newSet)
+                    if target.type == .working {
+                        if shouldStartRestTimer(after: target.entry) {
                             restTimer.start(duration: pendingRestDuration ?? restTimerDuration)
                         }
-                    },
-                    prMetric: target.entry.exercise?.prMetric
-                )
+                    }
+                }
             }
             .sheet(item: $warmupSuggestionEntry) { entry in
                 WarmupSuggestionView(entry: entry) { newSets in
@@ -227,6 +187,16 @@ struct NewWorkoutView: View {
         }
     }
 
+    private func shouldStartRestTimer(after entry: ExerciseEntry) -> Bool {
+        guard let groupID = entry.supersetGroupID else { return true }
+        let partners = workout.exercises.filter { $0.supersetGroupID == groupID && $0.persistentModelID != entry.persistentModelID }
+        guard let partner = partners.first else { return true }
+
+        let entryWorkingCount = entry.workingSets.count
+        let partnerWorkingCount = partner.workingSets.count
+        return partnerWorkingCount >= entryWorkingCount
+    }
+
     private func deleteSets(from entry: ExerciseEntry, at offsets: IndexSet) {
         let sorted = entry.sortedSets
         for index in offsets {
@@ -243,6 +213,172 @@ struct NewWorkoutView: View {
             modelContext.delete(entry)
         }
         workout.exercises.removeAll { $0.persistentModelID == entry.persistentModelID }
+    }
+
+    @ViewBuilder
+    private func exerciseSection(_ entry: ExerciseEntry) -> some View {
+        Section {
+            ForEach(entry.sortedSets) { set in
+                SetRow(set: set)
+            }
+            .onDelete { offsets in
+                deleteSets(from: entry, at: offsets)
+            }
+            setActionButtons(for: entry)
+        } header: {
+            exerciseHeader(entry, showPairCheckbox: true)
+        }
+    }
+
+    @ViewBuilder
+    private func supersetSection(_ group: [ExerciseEntry]) -> some View {
+        Section {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: "link")
+                        .font(.caption2)
+                    Text("SUPERSET")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(1.0)
+                }
+                .foregroundStyle(AppTheme.accent)
+
+                Button("Unlink") {
+                    unlinkSuperset(group)
+                }
+                .font(.caption2)
+            }
+            .padding(.vertical, 2)
+
+            ForEach(group) { entry in
+                VStack(alignment: .leading, spacing: 6) {
+                    exerciseHeader(entry, showPairCheckbox: false)
+                    ForEach(entry.sortedSets) { set in
+                        SetRow(set: set)
+                    }
+                    setActionButtons(for: entry)
+                }
+                .padding(.vertical, 4)
+                if entry.persistentModelID != group.last?.persistentModelID {
+                    Rectangle().fill(AppTheme.textSecondary.opacity(0.15)).frame(height: 1)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func exerciseHeader(_ entry: ExerciseEntry, showPairCheckbox: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                if isPairingMode && showPairCheckbox {
+                    Button {
+                        togglePairingSelection(entry)
+                    } label: {
+                        Image(systemName: selectedForPairing.contains(entry.persistentModelID) ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(AppTheme.accent)
+                    }
+                }
+                Text(entry.exercise?.name ?? "Unknown Exercise")
+                Spacer()
+                if !isPairingMode {
+                    Button {
+                        deleteExerciseEntry(entry)
+                    } label: {
+                        Image(systemName: "trash")
+                            .foregroundStyle(PlateColor.deadlift)
+                            .font(.caption)
+                    }
+                }
+            }
+            if let lastLabel = entry.lastSessionLabel {
+                Text("Last time: \(lastLabel)")
+                    .font(.caption2)
+                    .foregroundStyle(AppTheme.textSecondary)
+                    .textCase(nil)
+            }
+            if let notes = entry.exercise?.notes, !notes.isEmpty {
+                HStack(alignment: .top, spacing: 4) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.caption2)
+                        .foregroundStyle(PlateColor.squat)
+                    Text(notes)
+                        .font(.caption2)
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .textCase(nil)
+                }
+                .padding(.top, 2)
+            }
+        }
+        .textCase(nil)
+    }
+
+    @ViewBuilder
+    private func setActionButtons(for entry: ExerciseEntry) -> some View {
+        HStack(spacing: 8) {
+            Button {
+                warmupSuggestionEntry = entry
+            } label: {
+                Image(systemName: "wand.and.stars")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+            .fixedSize()
+
+            Button {
+                setEditorTarget = SetEditorTarget(entry: entry, type: .warmup)
+            } label: {
+                Text("Warm-up")
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+
+            Menu {
+                Button("90s rest") { pendingRestDuration = 90 }
+                Button("2 min rest") { pendingRestDuration = 120 }
+                Button("3 min rest") { pendingRestDuration = 180 }
+                Button("5 min rest") { pendingRestDuration = 300 }
+                Divider()
+                Button("Use default (\(restTimerDuration)s)") { pendingRestDuration = nil }
+            } label: {
+                Text("Working Set")
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: .infinity)
+            } primaryAction: {
+                setEditorTarget = SetEditorTarget(entry: entry, type: .working)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+        }
+    }
+
+    private func togglePairingSelection(_ entry: ExerciseEntry) {
+        if selectedForPairing.contains(entry.persistentModelID) {
+            selectedForPairing.remove(entry.persistentModelID)
+        } else if selectedForPairing.count < 2 {
+            selectedForPairing.insert(entry.persistentModelID)
+        }
+    }
+
+    private func confirmPairing() {
+        guard selectedForPairing.count == 2 else { return }
+        let groupID = UUID()
+        for entry in workout.exercises where selectedForPairing.contains(entry.persistentModelID) {
+            entry.supersetGroupID = groupID
+        }
+        selectedForPairing.removeAll()
+        isPairingMode = false
+    }
+
+    private func unlinkSuperset(_ group: [ExerciseEntry]) {
+        for entry in group {
+            entry.supersetGroupID = nil
+        }
     }
 }
 

@@ -12,6 +12,7 @@ import SwiftData
 final class ExerciseEntry {
     var exercise: Exercise?
     var workout: Workout?
+    var supersetGroupID: UUID?
 
     @Relationship(deleteRule: .cascade)
     var sets: [SetEntry] = []
@@ -22,7 +23,6 @@ final class ExerciseEntry {
         self.exercise = exercise
     }
 
-    // Convenience computed properties for summaries later
     var workingSets: [SetEntry] {
         sets.filter { $0.setType == .working }
     }
