@@ -79,51 +79,6 @@ struct ReportView: View {
 private struct ReportResultsView: View {
     let report: WorkoutReport
     let weightUnit: WeightUnit
-    
-    @ViewBuilder
-    private func deltaBadge(for lift: LiftProgress) -> some View {
-        switch lift.metric {
-        case .weight:
-            if let delta = lift.weightDelta {
-                Text("\(delta >= 0 ? "+" : "")\(String(format: "%.1f", weightUnit.fromKg(delta))) \(weightUnit.label)")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(delta >= 0 ? .green : PlateColor.deadlift)
-            }
-        case .reps:
-            if let delta = lift.repsDelta {
-                Text("\(delta >= 0 ? "+" : "")\(delta) reps")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(delta >= 0 ? .green : PlateColor.deadlift)
-            }
-        case .assisted:
-            if let delta = lift.effectiveLoadDelta {
-                Text("\(delta >= 0 ? "+" : "")\(String(format: "%.1f", weightUnit.fromKg(delta))) \(weightUnit.label)")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(delta >= 0 ? .green : PlateColor.deadlift)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func progressLine(for lift: LiftProgress) -> some View {
-        switch lift.metric {
-        case .weight:
-            if let start = lift.earliestWeight, let end = lift.bestWeight {
-                Text("\(String(format: "%.1f", weightUnit.fromKg(start))) → \(String(format: "%.1f", weightUnit.fromKg(end))) \(weightUnit.label)")
-                    .font(.caption).foregroundStyle(AppTheme.textSecondary)
-            }
-        case .reps:
-            if let start = lift.earliestReps, let end = lift.bestReps {
-                Text("\(start) → \(end) reps (bodyweight)")
-                    .font(.caption).foregroundStyle(AppTheme.textSecondary)
-            }
-        case .assisted:
-            if let start = lift.earliestEffectiveLoad, let end = lift.bestEffectiveLoad {
-                Text("\(String(format: "%.1f", weightUnit.fromKg(start))) → \(String(format: "%.1f", weightUnit.fromKg(end))) \(weightUnit.label) effective load")
-                    .font(.caption).foregroundStyle(AppTheme.textSecondary)
-            }
-        }
-    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -152,8 +107,13 @@ private struct ReportResultsView: View {
                             }
                             progressLine(for: lift)
                             if let oneRM = lift.estimatedOneRepMax {
-                                Text("Est. 1RM: \(String(format: "%.1f", weightUnit.fromKg(oneRM))) \(weightUnit.label)")
-                                    .font(.caption2).foregroundStyle(AppTheme.textSecondary)
+                                if let srcWeight = lift.estimatedOneRepMaxSourceWeight, let srcReps = lift.estimatedOneRepMaxSourceReps {
+                                    Text("Est. 1RM: \(String(format: "%.1f", weightUnit.fromKg(oneRM))) \(weightUnit.label) (from \(String(format: "%.1f", weightUnit.fromKg(srcWeight))) \(weightUnit.label) × \(srcReps))")
+                                        .font(.caption2).foregroundStyle(AppTheme.textSecondary)
+                                } else {
+                                    Text("Est. 1RM: \(String(format: "%.1f", weightUnit.fromKg(oneRM))) \(weightUnit.label)")
+                                        .font(.caption2).foregroundStyle(AppTheme.textSecondary)
+                                }
                             }
                             if let ratio = lift.bodyweightRatio {
                                 Text("\(String(format: "%.2f", ratio))x bodyweight")
@@ -162,6 +122,17 @@ private struct ReportResultsView: View {
                             if lift.addedWeightSeen, let maxAdded = lift.maxAddedWeight {
                                 Text("Added weight used, up to \(String(format: "%.1f", weightUnit.fromKg(maxAdded))) \(weightUnit.label)")
                                     .font(.caption2).foregroundStyle(AppTheme.textSecondary)
+                            }
+                            if lift.deloadSignal {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(PlateColor.deadlift)
+                                    Text("Effort rising 3 weeks straight without a weight increase — consider a deload")
+                                        .font(.caption2)
+                                        .foregroundStyle(PlateColor.deadlift)
+                                }
+                                .padding(.top, 2)
                             }
                         }
                         .padding(.vertical, 4)
@@ -226,5 +197,50 @@ private struct ReportResultsView: View {
         if effort >= 8.5 { return PlateColor.deadlift }
         if effort >= 7 { return PlateColor.squat }
         return .green
+    }
+
+    @ViewBuilder
+    private func deltaBadge(for lift: LiftProgress) -> some View {
+        switch lift.metric {
+        case .weight:
+            if let delta = lift.weightDelta {
+                Text("\(delta >= 0 ? "+" : "")\(String(format: "%.1f", weightUnit.fromKg(delta))) \(weightUnit.label)")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(delta >= 0 ? .green : PlateColor.deadlift)
+            }
+        case .reps:
+            if let delta = lift.repsDelta {
+                Text("\(delta >= 0 ? "+" : "")\(delta) reps")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(delta >= 0 ? .green : PlateColor.deadlift)
+            }
+        case .assisted:
+            if let delta = lift.effectiveLoadDelta {
+                Text("\(delta >= 0 ? "+" : "")\(String(format: "%.1f", weightUnit.fromKg(delta))) \(weightUnit.label)")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(delta >= 0 ? .green : PlateColor.deadlift)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func progressLine(for lift: LiftProgress) -> some View {
+        switch lift.metric {
+        case .weight:
+            if let start = lift.earliestWeight, let end = lift.bestWeight {
+                Text("\(String(format: "%.1f", weightUnit.fromKg(start))) → \(String(format: "%.1f", weightUnit.fromKg(end))) \(weightUnit.label)")
+                    .font(.caption).foregroundStyle(AppTheme.textSecondary)
+            }
+        case .reps:
+            if let start = lift.earliestReps, let end = lift.bestReps {
+                Text("\(start) → \(end) reps (bodyweight)")
+                    .font(.caption).foregroundStyle(AppTheme.textSecondary)
+            }
+        case .assisted:
+            if let start = lift.earliestEffectiveLoad, let end = lift.bestEffectiveLoad {
+                Text("\(String(format: "%.1f", weightUnit.fromKg(start))) → \(String(format: "%.1f", weightUnit.fromKg(end))) \(weightUnit.label) effective load")
+                    .font(.caption).foregroundStyle(AppTheme.textSecondary)
+            }
+        }
     }
 }

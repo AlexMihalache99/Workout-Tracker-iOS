@@ -28,8 +28,10 @@ struct LiftProgress: Identifiable {
 
     // .weight
     var earliestWeight: Double?
-    var bestWeight: Double?
+    var bestWeight: Double?                        // topWeightSet's weight — heaviest weight moved
     var estimatedOneRepMax: Double?
+    var estimatedOneRepMaxSourceWeight: Double?     // which set produced the 1RM estimate — may differ from bestWeight
+    var estimatedOneRepMaxSourceReps: Int?
     var bodyweightRatio: Double?
 
     // .reps (bodyweight sets only)
@@ -41,7 +43,7 @@ struct LiftProgress: Identifiable {
     // .assisted
     var earliestEffectiveLoad: Double?
     var bestEffectiveLoad: Double?
-    
+
     var deloadSignal: Bool = false
 
     var weightDelta: Double? {
@@ -68,8 +70,8 @@ struct WorkoutReport {
     let totalVolume: Double
     let weeklyStats: [WeeklyStat]
     let liftProgress: [LiftProgress]
-    let bestWeek: WeeklyStat?
-    let toughestWeek: WeeklyStat?
+    let lowestEffortWeek: WeeklyStat?    // week with the lowest average RPE — sets felt easiest
+    let highestEffortWeek: WeeklyStat?   // week with the highest average RPE — sets felt hardest
     let insights: [String]
 }
 
@@ -101,8 +103,8 @@ enum ReportGenerator {
         }.sorted { $0.weekStart < $1.weekStart }
 
         let weeksWithEffort = weeklyStats.filter { $0.avgEffort != nil }
-        let bestWeek = weeksWithEffort.min { ($0.avgEffort ?? 0) < ($1.avgEffort ?? 0) }
-        let toughestWeek = weeksWithEffort.max { ($0.avgEffort ?? 0) < ($1.avgEffort ?? 0) }
+        let lowestEffortWeek = weeksWithEffort.min { ($0.avgEffort ?? 0) < ($1.avgEffort ?? 0) }
+        let highestEffortWeek = weeksWithEffort.max { ($0.avgEffort ?? 0) < ($1.avgEffort ?? 0) }
 
         let trackedExercises = allExercises.filter { $0.prMetric != nil }
         var liftProgress: [LiftProgress] = []
@@ -123,12 +125,21 @@ enum ReportGenerator {
                 }.sorted { $0.date < $1.date }
                 guard !sessions.isEmpty else { continue }
 
+                // topWeightSet: heaviest weight moved, regardless of reps
                 progress.earliestWeight = sessions.first?.weight
                 progress.bestWeight = sessions.map { $0.weight }.max()
-                let best1RM = sessions.max { lhs, rhs in
+
+                // bestEstimated1RMSet: independently selected. Epley can favor a lighter,
+                // higher-rep set over the nominally heaviest set (e.g. 100kg x 10 can beat
+                // 110kg x 3) -- this is correct, not a bug, and the two are not guaranteed
+                // to be the same set.
+                let best1RMSession = sessions.max { lhs, rhs in
                     (lhs.weight * (1 + Double(lhs.reps) / 30.0)) < (rhs.weight * (1 + Double(rhs.reps) / 30.0))
                 }
-                progress.estimatedOneRepMax = best1RM.map { $0.weight * (1 + Double($0.reps) / 30.0) }
+                progress.estimatedOneRepMax = best1RMSession.map { $0.weight * (1 + Double($0.reps) / 30.0) }
+                progress.estimatedOneRepMaxSourceWeight = best1RMSession?.weight
+                progress.estimatedOneRepMaxSourceReps = best1RMSession?.reps
+
                 if bodyweightKg > 0, let best = progress.bestWeight {
                     progress.bodyweightRatio = best / bodyweightKg
                 }
@@ -172,8 +183,8 @@ enum ReportGenerator {
             phase: phase,
             liftProgress: liftProgress,
             weeklyStats: weeklyStats,
-            bestWeek: bestWeek,
-            toughestWeek: toughestWeek,
+            lowestEffortWeek: lowestEffortWeek,
+            highestEffortWeek: highestEffortWeek,
             totalWorkouts: inRange.count
         )
 
@@ -182,7 +193,8 @@ enum ReportGenerator {
             totalWorkouts: inRange.count, totalSets: totalSets,
             totalReps: totalReps, totalVolume: totalVolume,
             weeklyStats: weeklyStats, liftProgress: liftProgress,
-            bestWeek: bestWeek, toughestWeek: toughestWeek, insights: insights
+            lowestEffortWeek: lowestEffortWeek, highestEffortWeek: highestEffortWeek,
+            insights: insights
         )
     }
 
@@ -192,12 +204,55 @@ enum ReportGenerator {
         return nil
     }
 
+    private static func detectDeloadSignal(entries: [ExerciseEntry], calendar: Calendar) -> Bool {
+        var weeklyEffort: [Date: [Double]] = [:]
+        for entry in entries {
+            guard let date = entry.workout?.date else { continue }
+            let weekStart = calendar.dateInterval(of: .weekOfYear, for: date)?.start ?? date
+            for set in entry.workingSets {
+                if let rpe = set.rpe {
+                    weeklyEffort[weekStart, default: []].append(rpe)
+                } else if let rir = set.rir {
+                    weeklyEffort[weekStart, default: []].append(10.0 - Double(rir))
+                }
+            }
+        }
+
+        let sortedWeeks = weeklyEffort.keys.sorted()
+        guard sortedWeeks.count >= 3 else { return false }
+
+        let avgByWeek = sortedWeeks.map { week -> Double in
+            let values = weeklyEffort[week] ?? []
+            return values.reduce(0, +) / Double(max(values.count, 1))
+        }
+
+        let lastThree = Array(avgByWeek.suffix(3))
+        guard lastThree.count == 3 else { return false }
+        let risingEffort = lastThree[0] < lastThree[1] && lastThree[1] < lastThree[2]
+
+        let lastThreeWeeks = Array(sortedWeeks.suffix(3))
+        let topSetsInWindow = entries.compactMap { entry -> (week: Date, weight: Double)? in
+            guard let date = entry.workout?.date,
+                  let weekStart = calendar.dateInterval(of: .weekOfYear, for: date)?.start,
+                  lastThreeWeeks.contains(weekStart),
+                  let top = entry.workingSets.map({ $0.weight }).max() else { return nil }
+            return (weekStart, top)
+        }
+        guard let firstWeekTop = topSetsInWindow.filter({ $0.week == lastThreeWeeks.first }).map({ $0.weight }).max(),
+              let lastWeekTop = topSetsInWindow.filter({ $0.week == lastThreeWeeks.last }).map({ $0.weight }).max() else {
+            return risingEffort
+        }
+        let weightStagnant = lastWeekTop <= firstWeekTop
+
+        return risingEffort && weightStagnant
+    }
+
     private static func buildInsights(
         phase: TrainingPhase,
         liftProgress: [LiftProgress],
         weeklyStats: [WeeklyStat],
-        bestWeek: WeeklyStat?,
-        toughestWeek: WeeklyStat?,
+        lowestEffortWeek: WeeklyStat?,
+        highestEffortWeek: WeeklyStat?,
         totalWorkouts: Int
     ) -> [String] {
         var insights: [String] = []
@@ -219,15 +274,19 @@ enum ReportGenerator {
                         }
                     }
                     if let oneRM = lift.estimatedOneRepMax {
-                        insights.append("\(lift.exerciseName) estimated 1RM (Epley): \(String(format: "%.1f", oneRM)) kg.")
+                        if let srcWeight = lift.estimatedOneRepMaxSourceWeight, let srcReps = lift.estimatedOneRepMaxSourceReps {
+                            insights.append("\(lift.exerciseName) estimated 1RM (Epley): \(String(format: "%.1f", oneRM)) kg, based on \(String(format: "%.1f", srcWeight)) kg × \(srcReps).")
+                        } else {
+                            insights.append("\(lift.exerciseName) estimated 1RM (Epley): \(String(format: "%.1f", oneRM)) kg.")
+                        }
                     }
                     if let ratio = lift.bodyweightRatio {
                         insights.append("\(lift.exerciseName) is now \(String(format: "%.2f", ratio))x your bodyweight.")
                     }
                 }
                 if lift.deloadSignal {
-                        insights.append("⚠️ \(lift.exerciseName): effort has risen for 3 straight weeks without a matching weight increase — a deload may help.")
-                    }
+                    insights.append("⚠️ \(lift.exerciseName): effort has risen for 3 straight weeks without a matching weight increase — a deload may help.")
+                }
 
             case .reps:
                 if let delta = lift.repsDelta {
@@ -270,57 +329,13 @@ enum ReportGenerator {
             }
         }
 
-        if let best = bestWeek, let toughest = toughestWeek, best.weekStart != toughest.weekStart {
+        if let lowest = lowestEffortWeek, let highest = highestEffortWeek, lowest.weekStart != highest.weekStart {
             let formatter = DateFormatter()
             formatter.dateFormat = "MMM d"
-            insights.append("Week of \(formatter.string(from: best.weekStart)) had your lowest average effort — you were likely feeling strongest.")
-            insights.append("Week of \(formatter.string(from: toughest.weekStart)) had your highest average effort — your toughest stretch.")
+            insights.append("Week of \(formatter.string(from: lowest.weekStart)) had your lowest average RPE — sets felt easiest that week.")
+            insights.append("Week of \(formatter.string(from: highest.weekStart)) had your highest average RPE — sets felt hardest that week.")
         }
 
         return insights
-    }
-    
-    private static func detectDeloadSignal(entries: [ExerciseEntry], calendar: Calendar) -> Bool {
-
-        var weeklyEffort: [Date: [Double]] = [:]
-        for entry in entries {
-            guard let date = entry.workout?.date else { continue }
-            let weekStart = calendar.dateInterval(of: .weekOfYear, for: date)?.start ?? date
-            for set in entry.workingSets {
-                if let rpe = set.rpe {
-                    weeklyEffort[weekStart, default: []].append(rpe)
-                } else if let rir = set.rir {
-                    weeklyEffort[weekStart, default: []].append(10.0 - Double(rir))
-                }
-            }
-        }
-
-        let sortedWeeks = weeklyEffort.keys.sorted()
-        guard sortedWeeks.count >= 3 else { return false }
-
-        let avgByWeek = sortedWeeks.map { week -> Double in
-            let values = weeklyEffort[week] ?? []
-            return values.reduce(0, +) / Double(max(values.count, 1))
-        }
-
-        let lastThree = Array(avgByWeek.suffix(3))
-        guard lastThree.count == 3 else { return false }
-        let risingEffort = lastThree[0] < lastThree[1] && lastThree[1] < lastThree[2]
-
-        let lastThreeWeeks = Array(sortedWeeks.suffix(3))
-        let topSetsInWindow = entries.compactMap { entry -> (week: Date, weight: Double)? in
-            guard let date = entry.workout?.date,
-                  let weekStart = calendar.dateInterval(of: .weekOfYear, for: date)?.start,
-                  lastThreeWeeks.contains(weekStart),
-                  let top = entry.workingSets.map({ $0.weight }).max() else { return nil }
-            return (weekStart, top)
-        }
-        guard let firstWeekTop = topSetsInWindow.filter({ $0.week == lastThreeWeeks.first }).map({ $0.weight }).max(),
-              let lastWeekTop = topSetsInWindow.filter({ $0.week == lastThreeWeeks.last }).map({ $0.weight }).max() else {
-            return risingEffort
-        }
-        let weightStagnant = lastWeekTop <= firstWeekTop
-
-        return risingEffort && weightStagnant
     }
 }
