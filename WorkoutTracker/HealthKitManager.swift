@@ -8,32 +8,36 @@
 
 import Foundation
 import HealthKit
+import Combine
 
 @MainActor
-final class HealthKitManager {
+final class HealthKitManager: ObservableObject {
     static let shared = HealthKitManager()
     private let store = HKHealthStore()
+
+    private let lastSyncErrorKey = "lastHealthSyncError"
+
+    @Published var lastSyncErrorMessage: String?
+
+    private init() {
+        lastSyncErrorMessage = UserDefaults.standard.string(forKey: lastSyncErrorKey)
+    }
 
     var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
     private let bodyMassType = HKQuantityType(.bodyMass)
+    private let workoutType = HKObjectType.workoutType()
     private let activeEnergyType = HKQuantityType(.activeEnergyBurned)
-    private let workoutType: HKWorkoutType = .workoutType()
-
-    private var readTypes: Set<HKObjectType> {
-        [bodyMassType]
-    }
-
-    private var writeTypes: Set<HKSampleType> {
-        [workoutType, activeEnergyType]
-    }
 
     func requestAuthorization() async throws {
-        guard isAvailable else {
-            throw HealthKitError.notAvailable
-        }
-
+        guard isAvailable else { return }
+        let readTypes: Set<HKObjectType> = [bodyMassType]
+        let writeTypes: Set<HKSampleType> = [workoutType]
         try await store.requestAuthorization(toShare: writeTypes, read: readTypes)
+    }
+
+    func checkWorkoutAuthorizationStatus() -> HKAuthorizationStatus {
+        store.authorizationStatus(for: workoutType)
     }
 
     func fetchLatestBodyweightKg() async -> Double? {
@@ -58,11 +62,12 @@ final class HealthKitManager {
             throw HealthKitError.notAvailable
         }
 
-        try await requestWorkoutAuthorizationIfNeeded()
-
-        guard hasWorkoutWriteAuthorization else {
+        let status = store.authorizationStatus(for: workoutType)
+        guard status == .sharingAuthorized else {
             throw HealthKitError.notAuthorized
         }
+
+        let safeEnd = end > start ? end : start.addingTimeInterval(60)
 
         let energyBurned = HKQuantity(unit: .kilocalorie(), doubleValue: estimatedCalories(sets: workingSets))
         let configuration = HKWorkoutConfiguration()
@@ -72,24 +77,20 @@ final class HealthKitManager {
         try await builder.beginCollection(at: start)
 
         let energySample = HKQuantitySample(
-            type: activeEnergyType,
+            type: HKQuantityType(.activeEnergyBurned),
             quantity: energyBurned,
             start: start,
-            end: end
+            end: safeEnd
         )
         try await builder.addSamples([energySample])
-        try await builder.endCollection(at: end)
+        try await builder.endCollection(at: safeEnd)
         _ = try await builder.finishWorkout()
-    }
-    
-    func checkWorkoutAuthorizationStatus() -> HKAuthorizationStatus {
-        store.authorizationStatus(for: workoutType)
     }
 
     var hasWorkoutWriteAuthorization: Bool {
-        store.authorizationStatus(for: workoutType) == .sharingAuthorized
-        && store.authorizationStatus(for: activeEnergyType) == .sharingAuthorized
-    }
+            store.authorizationStatus(for: workoutType) == .sharingAuthorized
+            && store.authorizationStatus(for: activeEnergyType) == .sharingAuthorized
+        }
 
     private func requestWorkoutAuthorizationIfNeeded() async throws {
         let needsAuthorization = store.authorizationStatus(for: workoutType) == .notDetermined
@@ -100,19 +101,29 @@ final class HealthKitManager {
         }
     }
 
+    func recordSyncError(_ message: String) {
+        lastSyncErrorMessage = message
+        UserDefaults.standard.set(message, forKey: lastSyncErrorKey)
+    }
+
+    func clearSyncError() {
+        lastSyncErrorMessage = nil
+        UserDefaults.standard.removeObject(forKey: lastSyncErrorKey)
+    }
+
     private func estimatedCalories(sets: Int) -> Double {
         Double(sets) * 6.0
     }
-    
-    enum HealthKitError: LocalizedError {
-        case notAvailable
-        case notAuthorized
+}
 
-        var errorDescription: String? {
-            switch self {
-            case .notAvailable: return "Health data isn't available on this device."
-            case .notAuthorized: return "Workout write access to Health isn't authorized. Check Settings → Privacy & Security → Health → WorkoutTracker."
-            }
+enum HealthKitError: LocalizedError {
+    case notAvailable
+    case notAuthorized
+
+    var errorDescription: String? {
+        switch self {
+        case .notAvailable: return "Health data isn't available on this device."
+        case .notAuthorized: return "Workout write access to Health isn't authorized. Check Settings → Privacy & Security → Health → WorkoutTracker."
         }
     }
 }

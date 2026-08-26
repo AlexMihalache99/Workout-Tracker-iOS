@@ -33,9 +33,12 @@ struct WorkoutDetailView: View {
             
             Section("Summary") {
                 LabeledContent("Date", value: workout.date.formatted(date: .abbreviated, time: .shortened))
+                if let minutes = workout.durationMinutes {
+                    LabeledContent("Duration", value: "\(minutes) min")
+                }
                 LabeledContent("Total Working Sets", value: "\(workout.totalWorkingSets)")
                 LabeledContent("Total Reps", value: "\(workout.totalReps)")
-                LabeledContent("Total Volume", value: "\(Int(weightUnit.fromKg(workout.totalVolume))) \(weightUnit.label)")
+                LabeledContent("Total Volume", value: "\(Int(workout.totalVolume)) kg")
             }
 
             Section("Notes") {

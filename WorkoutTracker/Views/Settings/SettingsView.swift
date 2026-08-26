@@ -17,6 +17,7 @@ struct SettingsView: View {
     @AppStorage("bodyweightKg") private var bodyweightKg: Double = 0
     @AppStorage("barWeightKg") private var barWeightKg: Double = 20
     @AppStorage("healthSyncEnabled") private var healthSyncEnabled: Bool = false
+    @ObservedObject private var healthManager = HealthKitManager.shared
     
 
     private var weightUnit: Binding<WeightUnit> {
@@ -46,35 +47,135 @@ struct SettingsView: View {
     //HealthKit
     @State private var isSyncingBodyweight = false
     @State private var healthSyncMessage: String?
+    
+    private var bodyweightBinding: Binding<Double> {
+        Binding<Double>(
+            get: {
+                guard bodyweightKg > 0 else { return 0 }
+                let unit = weightUnit.wrappedValue
+                return unit.fromKg(bodyweightKg)
+            },
+            set: { newValue in
+                let unit = weightUnit.wrappedValue
+                bodyweightKg = unit.toKg(newValue)
+            }
+        )
+    }
+    
+    private var bodyweightFormat: FloatingPointFormatStyle<Double> {
+        .number.precision(.fractionLength(1))
+    }
+    
+    private var weightUnitOptions: some View {
+        ForEach(WeightUnit.allCases, id: \.self) { unit in
+            Text(unit.label.uppercased())
+                .tag(unit)
+        }
+    }
+    
+    private var appleHealthSection: some View {
+        Section("Apple Health") {
+            healthSyncErrorView
+
+            Toggle("Sync with Apple Health", isOn: $healthSyncEnabled)
+                .onChange(of: healthSyncEnabled) { _, newValue in
+                    handleHealthSyncToggle(newValue)
+                }
+
+            if healthSyncEnabled {
+                Button {
+                    Task {
+                        await syncBodyweightFromHealth()
+                    }
+                } label: {
+                    HStack {
+                        Text("Sync Bodyweight from Health")
+                        Spacer()
+
+                        if isSyncingBodyweight {
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isSyncingBodyweight)
+            }
+
+            Text("When enabled, completed workouts are logged to Health as strength training, and you can pull your latest bodyweight from Health.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+    
+    private func handleHealthSyncToggle(_ newValue: Bool) {
+        guard newValue else {
+            return
+        }
+
+        Task {
+            do {
+                try await HealthKitManager.shared.requestAuthorization()
+
+                if HealthKitManager.shared.hasWorkoutWriteAuthorization {
+                    feedbackIsError = false
+                    feedbackMessage = "Health sync enabled."
+                } else {
+                    healthSyncEnabled = false
+                    feedbackIsError = true
+                    feedbackMessage = "Health permission wasn't granted for workouts. You can enable it in Settings → Privacy & Security → Health → WorkoutTracker."
+                }
+            } catch {
+                healthSyncEnabled = false
+                feedbackIsError = true
+                feedbackMessage = "Couldn't request Health access: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    private var healthSyncErrorView: some View {
+        Group {
+            if let error = healthManager.lastSyncErrorMessage {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(PlateColor.deadlift)
+                            .font(.caption)
+
+                        Text("Last Health sync failed: \(error)")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.textPrimary)
+                    }
+
+                    Button("Dismiss") {
+                        healthManager.clearSyncError()
+                    }
+                    .font(.caption)
+                }
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Units") {
                     Picker("Weight Unit", selection: weightUnit) {
-                        ForEach(WeightUnit.allCases, id: \.self) { unit in
-                            Text(unit.label.uppercased()).tag(unit)
-                        }
+                        weightUnitOptions
                     }
                     .pickerStyle(.segmented)
-                    
+
                     Text("Weights are always stored in kg internally, so switching units is safe and won't affect past data.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    
                 }
 
                 Section("Body Metrics") {
                     HStack {
                         Text("Current Bodyweight")
                         Spacer()
-                        TextField("Not set", value: Binding(
-                            get: { bodyweightKg > 0 ? weightUnit.wrappedValue.fromKg(bodyweightKg) : 0 },
-                            set: { bodyweightKg = weightUnit.wrappedValue.toKg($0) }
-                        ), format: .number.precision(.fractionLength(1)))
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .focused($bodyweightFieldFocused)
+                        TextField("Not set", value: bodyweightBinding, format: bodyweightFormat)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .focused($bodyweightFieldFocused)
                         Text(weightUnit.wrappedValue.label)
                             .foregroundStyle(.secondary)
                         
@@ -85,49 +186,7 @@ struct SettingsView: View {
                 }
                 
                 
-                Section("Apple Health") {
-                    Toggle("Sync with Apple Health", isOn: $healthSyncEnabled)
-                        .onChange(of: healthSyncEnabled) { _, newValue in
-                            if newValue {
-                                Task {
-                                    do {
-                                        try await HealthKitManager.shared.requestAuthorization()
-                                        if HealthKitManager.shared.hasWorkoutWriteAuthorization {
-                                            feedbackIsError = false
-                                            feedbackMessage = "Health sync enabled."
-                                        } else {
-                                            healthSyncEnabled = false
-                                            feedbackIsError = true
-                                            feedbackMessage = "Health permission wasn't granted for workouts. You can enable it in Settings → Privacy & Security → Health → WorkoutTracker."
-                                        }
-                                    } catch {
-                                        healthSyncEnabled = false
-                                        feedbackIsError = true
-                                        feedbackMessage = "Couldn't request Health access: \(error.localizedDescription)"
-                                    }
-                                }
-                            }
-                        }
-
-                    if healthSyncEnabled {
-                        Button {
-                            Task { await syncBodyweightFromHealth() }
-                        } label: {
-                            HStack {
-                                Text("Sync Bodyweight from Health")
-                                Spacer()
-                                if isSyncingBodyweight {
-                                    ProgressView()
-                                }
-                            }
-                        }
-                        .disabled(isSyncingBodyweight)
-                    }
-
-                    Text("When enabled, completed workouts are logged to Health as strength training, and you can pull your latest bodyweight from Health.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                appleHealthSection
                 
                 Section("Rest Timer") {
                     Stepper(value: $restTimerDuration, in: 30...300, step: 15) {
