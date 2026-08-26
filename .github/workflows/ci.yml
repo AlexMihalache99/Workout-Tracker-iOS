@@ -17,21 +17,85 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -switch /Applications/Xcode_16.app/Contents/Developer
+      - name: Show active Xcode
+        run: xcode-select -p
 
       - name: Install xcbeautify
         run: brew install xcbeautify
 
-      - name: Show available simulators
-        run: xcrun simctl list devices available
+      - name: Show build settings relevant to destination eligibility
+        run: |
+          xcodebuild -showBuildSettings \
+            -project WorkoutTracker.xcodeproj \
+            -scheme WorkoutTracker \
+            | grep -E "IPHONEOS_DEPLOYMENT_TARGET|SUPPORTED_PLATFORMS|TARGETED_DEVICE_FAMILY|PRODUCT_NAME"
 
+      - name: Create an iPhone simulator matching this Xcode's SDK
+        id: sim
+        run: |
+          echo "--- SDKs supported by the active Xcode ---"
+          xcodebuild -showsdks
+
+          SDK_VERSION=$(xcodebuild -showsdks \
+            | grep -i 'Simulator - iOS' \
+            | grep -o -E '[0-9]+\.[0-9]+' \
+            | head -n 1)
+          if [ -z "$SDK_VERSION" ]; then
+            echo "Could not determine iOS Simulator SDK version." >&2
+            exit 1
+          fi
+          echo "Active Xcode supports iOS Simulator SDK: $SDK_VERSION"
+
+          echo "--- Available iOS runtimes ---"
+          xcrun simctl list runtimes
+
+          RUNTIME_ID=$(xcrun simctl list runtimes \
+            | grep -E "^iOS $SDK_VERSION " \
+            | grep -o -E 'com\.apple\.CoreSimulator\.SimRuntime\.iOS[^ ]*')
+          if [ -z "$RUNTIME_ID" ]; then
+            echo "No installed runtime matches iOS $SDK_VERSION." >&2
+            exit 1
+          fi
+          echo "Using runtime: $RUNTIME_ID"
+
+          echo "--- Available iPhone device types ---"
+          xcrun simctl list devicetypes | grep iPhone
+
+          DEVICETYPE_ID=$(xcrun simctl list devicetypes \
+            | grep 'iPhone 16 (' \
+            | head -n 1 \
+            | grep -o -E 'com\.apple\.CoreSimulator\.SimDeviceType\.[^)]*')
+          if [ -z "$DEVICETYPE_ID" ]; then
+            DEVICETYPE_ID=$(xcrun simctl list devicetypes \
+              | grep 'iPhone' \
+              | head -n 1 \
+              | grep -o -E 'com\.apple\.CoreSimulator\.SimDeviceType\.[^)]*')
+          fi
+          if [ -z "$DEVICETYPE_ID" ]; then
+            echo "No iPhone device type found." >&2
+            exit 1
+          fi
+          echo "Using device type: $DEVICETYPE_ID"
+
+          UDID=$(xcrun simctl create "CI-iPhone" "$DEVICETYPE_ID" "$RUNTIME_ID")
+          echo "Created simulator UDID: $UDID"
+
+          echo "--- Booting simulator ---"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+
+          echo "--- Confirming device is now visible ---"
+          xcrun simctl list devices | grep "$UDID"
+
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "os_version=$SDK_VERSION" >> "$GITHUB_OUTPUT"
       - name: Build and test
         run: |
+          set -o pipefail
           xcodebuild test \
             -project WorkoutTracker.xcodeproj \
             -scheme WorkoutTracker \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -destination "platform=iOS Simulator,name=CI-iPhone,OS=${{ steps.sim.outputs.os_version }}" \
             -skipMacroValidation \
             | xcbeautify --renderer github-actions
         env:
