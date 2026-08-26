@@ -23,30 +23,43 @@ jobs:
       - name: Install xcbeautify
         run: brew install xcbeautify
 
-      - name: Show destinations eligible for this scheme
-        run: |
-          xcodebuild -project WorkoutTracker.xcodeproj \
-            -scheme WorkoutTracker \
-            -showdestinations
-
-      - name: Find an eligible iOS Simulator destination
+      - name: Create an iPhone simulator
         id: sim
         run: |
-          xcodebuild -project WorkoutTracker.xcodeproj \
-            -scheme WorkoutTracker \
-            -showdestinations > /tmp/destinations.txt 2>&1
+          echo "--- Available iOS runtimes ---"
+          xcrun simctl list runtimes
 
-          UDID=$(grep 'platform:iOS Simulator' /tmp/destinations.txt \
-            | grep -o -E 'id:[0-9A-Fa-f-]+' \
-            | head -n 1 \
-            | cut -d: -f2)
-
-          if [ -z "$UDID" ]; then
-            echo "No eligible iOS Simulator destination found." >&2
+          RUNTIME_ID=$(xcrun simctl list runtimes \
+            | grep -E '^iOS ' \
+            | tail -n 1 \
+            | grep -o -E 'com\.apple\.CoreSimulator\.SimRuntime\.iOS[^ ]*')
+          if [ -z "$RUNTIME_ID" ]; then
+            echo "No iOS runtime found." >&2
             exit 1
           fi
+          echo "Using runtime: $RUNTIME_ID"
 
-          echo "Found simulator UDID: $UDID"
+          echo "--- Available iPhone device types ---"
+          xcrun simctl list devicetypes | grep iPhone
+
+          DEVICETYPE_ID=$(xcrun simctl list devicetypes \
+            | grep 'iPhone 16 (' \
+            | head -n 1 \
+            | grep -o -E 'com\.apple\.CoreSimulator\.SimDeviceType\.[^)]*')
+          if [ -z "$DEVICETYPE_ID" ]; then
+            DEVICETYPE_ID=$(xcrun simctl list devicetypes \
+              | grep 'iPhone' \
+              | head -n 1 \
+              | grep -o -E 'com\.apple\.CoreSimulator\.SimDeviceType\.[^)]*')
+          fi
+          if [ -z "$DEVICETYPE_ID" ]; then
+            echo "No iPhone device type found." >&2
+            exit 1
+          fi
+          echo "Using device type: $DEVICETYPE_ID"
+
+          UDID=$(xcrun simctl create "CI-iPhone" "$DEVICETYPE_ID" "$RUNTIME_ID")
+          echo "Created simulator UDID: $UDID"
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
       - name: Build and test
