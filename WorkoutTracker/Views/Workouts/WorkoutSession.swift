@@ -44,12 +44,19 @@ final class WorkoutSession: ObservableObject {
         var result: [[ExerciseEntry]] = []
         var seen: Set<PersistentIdentifier> = []
 
+        var groupedByID: [UUID: [ExerciseEntry]] = [:]
+        for entry in workout.exercises {
+            if let groupID = entry.supersetGroupID {
+                groupedByID[groupID, default: []].append(entry)
+            }
+        }
+
         for entry in workout.exercises {
             if seen.contains(entry.persistentModelID) { continue }
-            if let groupID = entry.supersetGroupID {
-                let partners = workout.exercises.filter { $0.supersetGroupID == groupID }
-                result.append(partners)
-                partners.forEach { seen.insert($0.persistentModelID) }
+
+            if let groupID = entry.supersetGroupID, let group = groupedByID[groupID], group.count == 2 {
+                result.append(group)
+                group.forEach { seen.insert($0.persistentModelID) }
             } else {
                 result.append([entry])
                 seen.insert(entry.persistentModelID)

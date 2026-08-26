@@ -308,4 +308,25 @@ final class WorkoutSessionTests: XCTestCase {
         session.addSet(SetEntry(setType: .working, setNumber: 2, weight: 60, reps: 8), to: entryA)
         XCTAssertFalse(session.shouldStartRestTimer(after: entryA))
     }
+    
+    func test_displayGroups_defensivelyUngroupsInvalidGroupSize() {
+        let e1 = TestFixtures.makeExercise(context: context, name: "A")
+        let e2 = TestFixtures.makeExercise(context: context, name: "B")
+        let e3 = TestFixtures.makeExercise(context: context, name: "C")
+        let workout = Workout(date: Date())
+        let session = WorkoutSession(workout: workout, context: context)
+        session.addExercise(e1); session.addExercise(e2); session.addExercise(e3)
+
+        let sharedID = UUID()
+        workout.exercises[0].supersetGroupID = sharedID
+        workout.exercises[1].supersetGroupID = sharedID
+        workout.exercises[2].supersetGroupID = sharedID
+
+        let groups = session.displayGroups
+
+        let allEntriesInGroups = groups.flatMap { $0 }
+        XCTAssertEqual(allEntriesInGroups.count, 3)
+        XCTAssertTrue(groups.allSatisfy { $0.count != 2 || $0.count == 2 })   // no group is treated as a valid pair
+        XCTAssertTrue(groups.allSatisfy { $0.count == 1 })                    // all fell back to standalone
+    }
 }
