@@ -12,6 +12,8 @@ struct BackupExercise: Codable {
     var name: String
     var category: String
     var isMainLift: Bool
+    var prMetric: PRMetric?
+    var notes: String?
 }
 
 struct BackupSet: Codable {
@@ -26,12 +28,15 @@ struct BackupSet: Codable {
 struct BackupExerciseEntry: Codable {
     var exerciseName: String
     var sets: [BackupSet]
+    var supersetGroupID: UUID?
 }
 
 struct BackupWorkout: Codable {
     var date: Date
     var name: String?
     var notes: String?
+    var sessionStartTime: Date?
+    var sessionEndTime: Date?
     var exercises: [BackupExerciseEntry]
 }
 
@@ -50,6 +55,7 @@ enum BackupError: LocalizedError {
         switch self {
         case .fileAccessDenied:
             return "Couldn't access the selected file."
+
         case .unsupportedVersion(let v):
             return "This backup (version \(v)) isn't supported by this version of the app."
         }
@@ -57,7 +63,8 @@ enum BackupError: LocalizedError {
 }
 
 enum BackupManager {
-    static let currentVersion = 1
+
+    static let currentVersion = 2
 
     enum ImportMode {
         case merge
@@ -67,15 +74,30 @@ enum BackupManager {
     // MARK: - Export
 
     static func buildBackup(context: ModelContext) throws -> BackupData {
-        let exercises = try context.fetch(FetchDescriptor<Exercise>())
-        let workouts = try context.fetch(FetchDescriptor<Workout>(sortBy: [SortDescriptor(\.date)]))
+        let exercises = try context.fetch(
+            FetchDescriptor<Exercise>()
+        )
 
-        let backupExercises = exercises.map {
-            BackupExercise(name: $0.name, category: $0.category, isMainLift: $0.isMainLift)
+        let workouts = try context.fetch(
+            FetchDescriptor<Workout>(
+                sortBy: [SortDescriptor(\.date)]
+            )
+        )
+
+        let backupExercises = exercises.map { exercise in
+            BackupExercise(
+                name: exercise.name,
+                category: exercise.category,
+                isMainLift: exercise.isMainLift,
+                prMetric: exercise.prMetric,
+                notes: exercise.notes
+            )
         }
 
-        let backupWorkouts = workouts.map { workout -> BackupWorkout in
-            let entries = workout.exercises.map { entry -> BackupExerciseEntry in
+        let backupWorkouts = workouts.map { workout in
+
+            let entries = workout.exercises.map { entry in
+
                 let sets = entry.sets.map { set in
                     BackupSet(
                         setType: set.setType == .warmup ? "warmup" : "working",
@@ -86,18 +108,38 @@ enum BackupManager {
                         rir: set.rir
                     )
                 }
-                return BackupExerciseEntry(exerciseName: entry.exercise?.name ?? "Unknown", sets: sets)
+
+                return BackupExerciseEntry(
+                    exerciseName: entry.exercise?.name ?? "Unknown",
+                    sets: sets,
+                    supersetGroupID: entry.supersetGroupID
+                )
             }
-            return BackupWorkout(date: workout.date, name: workout.name, notes: workout.notes, exercises: entries)
+
+            return BackupWorkout(
+                date: workout.date,
+                name: workout.name,
+                notes: workout.notes,
+                sessionStartTime: workout.sessionStartTime,
+                sessionEndTime: workout.sessionEndTime,
+                exercises: entries
+            )
         }
 
-        return BackupData(version: currentVersion, exportedAt: .now, exercises: backupExercises, workouts: backupWorkouts)
+        return BackupData(
+            version: currentVersion,
+            exportedAt: .now,
+            exercises: backupExercises,
+            workouts: backupWorkouts
+        )
     }
 
     static func encode(_ backup: BackupData) throws -> Data {
         let encoder = JSONEncoder()
+
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
         return try encoder.encode(backup)
     }
 
@@ -105,45 +147,150 @@ enum BackupManager {
 
     static func decode(_ data: Data) throws -> BackupData {
         let decoder = JSONDecoder()
+
         decoder.dateDecodingStrategy = .iso8601
-        let backup = try decoder.decode(BackupData.self, from: data)
+
+        let backup = try decoder.decode(
+            BackupData.self,
+            from: data
+        )
+
         guard backup.version <= currentVersion else {
             throw BackupError.unsupportedVersion(backup.version)
         }
+
         return backup
     }
 
-    static func importBackup(_ backup: BackupData, context: ModelContext, mode: ImportMode) throws {
+    static func importBackup(
+        _ backup: BackupData,
+        context: ModelContext,
+        mode: ImportMode
+    ) throws {
+
+        // MARK: Replace
+
         if mode == .replace {
-            let existingWorkouts = try context.fetch(FetchDescriptor<Workout>())
-            for workout in existingWorkouts { context.delete(workout) }
-            let existingExercises = try context.fetch(FetchDescriptor<Exercise>())
-            for exercise in existingExercises { context.delete(exercise) }
+            let existingWorkouts = try context.fetch(
+                FetchDescriptor<Workout>()
+            )
+
+            for workout in existingWorkouts {
+                context.delete(workout)
+            }
+
+            let existingExercises = try context.fetch(
+                FetchDescriptor<Exercise>()
+            )
+
+            for exercise in existingExercises {
+                context.delete(exercise)
+            }
+
             try context.save()
         }
 
-        var exerciseByName: [String: Exercise] = [:]
-        let existing = try context.fetch(FetchDescriptor<Exercise>())
-        for exercise in existing { exerciseByName[exercise.name] = exercise }
+        // MARK: Exercise catalog
 
-        for backupExercise in backup.exercises where exerciseByName[backupExercise.name] == nil {
-            let newExercise = Exercise(name: backupExercise.name, category: backupExercise.category, isMainLift: backupExercise.isMainLift)
-            context.insert(newExercise)
-            exerciseByName[backupExercise.name] = newExercise
+        var exerciseByName: [String: Exercise] = [:]
+
+        let existingExercises = try context.fetch(
+            FetchDescriptor<Exercise>()
+        )
+
+        for exercise in existingExercises {
+            exerciseByName[exercise.name] = exercise
         }
 
+        for backupExercise in backup.exercises {
+
+            if let existingExercise = exerciseByName[backupExercise.name] {
+
+                // Restore metadata from backup.
+                existingExercise.category = backupExercise.category
+                existingExercise.isMainLift = backupExercise.isMainLift
+                existingExercise.prMetric = backupExercise.prMetric
+                existingExercise.notes = backupExercise.notes
+
+            } else {
+
+                let newExercise = Exercise(
+                    name: backupExercise.name,
+                    category: backupExercise.category,
+                    isMainLift: backupExercise.isMainLift,
+                    prMetric: backupExercise.prMetric,
+                    notes: backupExercise.notes
+                )
+
+                context.insert(newExercise)
+
+                exerciseByName[backupExercise.name] = newExercise
+            }
+        }
+
+        // MARK: Workouts
+
         for backupWorkout in backup.workouts {
-            let workout = Workout(date: backupWorkout.date, name: backupWorkout.name, notes: backupWorkout.notes)
+
+            let workout = Workout(
+                date: backupWorkout.date,
+                name: backupWorkout.name,
+                notes: backupWorkout.notes
+            )
+
+            workout.sessionStartTime = backupWorkout.sessionStartTime
+            workout.sessionEndTime = backupWorkout.sessionEndTime
+
             context.insert(workout)
 
             for backupEntry in backupWorkout.exercises {
-                guard let exercise = exerciseByName[backupEntry.exerciseName] else { continue }
-                let entry = ExerciseEntry(exercise: exercise)
+
+                // IMPORTANT:
+                // An exercise entry must never silently disappear.
+                //
+                // Normally the exercise should already exist in
+                // backup.exercises. But if an older/corrupt backup
+                // contains an entry whose exercise is missing from
+                // the catalog, create a fallback exercise instead
+                // of dropping the entry.
+
+                let exercise: Exercise
+
+                if let existingExercise = exerciseByName[backupEntry.exerciseName] {
+
+                    exercise = existingExercise
+
+                } else {
+
+                    let recoveredExercise = Exercise(
+                        name: backupEntry.exerciseName,
+                        category: "Imported",
+                        isMainLift: false
+                    )
+
+                    context.insert(recoveredExercise)
+
+                    exerciseByName[backupEntry.exerciseName] = recoveredExercise
+
+                    exercise = recoveredExercise
+                }
+
+                let entry = ExerciseEntry(
+                    exercise: exercise
+                )
+
                 entry.workout = workout
+                entry.supersetGroupID = backupEntry.supersetGroupID
+
                 context.insert(entry)
 
                 for backupSet in backupEntry.sets {
-                    let type: SetType = backupSet.setType == "warmup" ? .warmup : .working
+
+                    let type: SetType =
+                        backupSet.setType == "warmup"
+                        ? .warmup
+                        : .working
+
                     let set = SetEntry(
                         setType: type,
                         setNumber: backupSet.setNumber,
@@ -152,10 +299,14 @@ enum BackupManager {
                         rpe: backupSet.rpe,
                         rir: backupSet.rir
                     )
+
                     set.exerciseEntry = entry
+
                     context.insert(set)
+
                     entry.sets.append(set)
                 }
+
                 workout.exercises.append(entry)
             }
         }
