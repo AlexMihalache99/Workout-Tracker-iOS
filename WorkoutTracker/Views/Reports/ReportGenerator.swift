@@ -206,9 +206,12 @@ enum ReportGenerator {
 
     private static func detectDeloadSignal(entries: [ExerciseEntry], calendar: Calendar) -> Bool {
         var weeklyEffort: [Date: [Double]] = [:]
+
         for entry in entries {
             guard let date = entry.workout?.date else { continue }
+
             let weekStart = calendar.dateInterval(of: .weekOfYear, for: date)?.start ?? date
+
             for set in entry.workingSets {
                 if let rpe = set.rpe {
                     weeklyEffort[weekStart, default: []].append(rpe)
@@ -221,27 +224,49 @@ enum ReportGenerator {
         let sortedWeeks = weeklyEffort.keys.sorted()
         guard sortedWeeks.count >= 3 else { return false }
 
-        let avgByWeek = sortedWeeks.map { week -> Double in
+        let lastThreeWeeks = Array(sortedWeeks.suffix(3))
+        guard lastThreeWeeks.count == 3 else { return false }
+
+        let areConsecutive = zip(lastThreeWeeks, lastThreeWeeks.dropFirst()).allSatisfy {
+            guard let expectedNext = calendar.date(byAdding: .weekOfYear, value: 1, to: $0) else {
+                return false
+            }
+            return calendar.isDate(expectedNext, inSameDayAs: $1)
+        }
+
+        guard areConsecutive else { return false }
+
+        let avgByWeek = lastThreeWeeks.map { week -> Double in
             let values = weeklyEffort[week] ?? []
             return values.reduce(0, +) / Double(max(values.count, 1))
         }
 
-        let lastThree = Array(avgByWeek.suffix(3))
-        guard lastThree.count == 3 else { return false }
-        let risingEffort = lastThree[0] < lastThree[1] && lastThree[1] < lastThree[2]
+        let risingEffort =
+            avgByWeek[0] < avgByWeek[1] &&
+            avgByWeek[1] < avgByWeek[2]
 
-        let lastThreeWeeks = Array(sortedWeeks.suffix(3))
         let topSetsInWindow = entries.compactMap { entry -> (week: Date, weight: Double)? in
             guard let date = entry.workout?.date,
                   let weekStart = calendar.dateInterval(of: .weekOfYear, for: date)?.start,
                   lastThreeWeeks.contains(weekStart),
-                  let top = entry.workingSets.map({ $0.weight }).max() else { return nil }
+                  let top = entry.workingSets.map({ $0.weight }).max() else {
+                return nil
+            }
+
             return (weekStart, top)
         }
-        guard let firstWeekTop = topSetsInWindow.filter({ $0.week == lastThreeWeeks.first }).map({ $0.weight }).max(),
-              let lastWeekTop = topSetsInWindow.filter({ $0.week == lastThreeWeeks.last }).map({ $0.weight }).max() else {
+
+        guard let firstWeekTop = topSetsInWindow
+            .filter({ $0.week == lastThreeWeeks.first })
+            .map({ $0.weight })
+            .max(),
+              let lastWeekTop = topSetsInWindow
+            .filter({ $0.week == lastThreeWeeks.last })
+            .map({ $0.weight })
+            .max() else {
             return risingEffort
         }
+
         let weightStagnant = lastWeekTop <= firstWeekTop
 
         return risingEffort && weightStagnant

@@ -203,6 +203,59 @@ final class ReportGeneratorTests: XCTestCase {
     }
 
     // MARK: - Deload signal
+    
+    func test_deloadSignal_doesNotFireWhenThreeWeeksHaveGap() {
+        let deadlift = Exercise(
+            name: "Deadlift",
+            category: "Big 3",
+            isMainLift: true,
+            prMetric: .weight
+        )
+
+        let w1 = makeWorkout(
+            date: daysAgo(28),
+            exercises: [
+                makeEntry(
+                    exercise: deadlift,
+                    sets: [makeSet(.working, 140, 3, rpe: 7.0)]
+                )
+            ]
+        )
+
+        let w3 = makeWorkout(
+            date: daysAgo(14),
+            exercises: [
+                makeEntry(
+                    exercise: deadlift,
+                    sets: [makeSet(.working, 140, 3, rpe: 8.5)]
+                )
+            ]
+        )
+
+        let w4 = makeWorkout(
+            date: daysAgo(7),
+            exercises: [
+                makeEntry(
+                    exercise: deadlift,
+                    sets: [makeSet(.working, 140, 3, rpe: 9.5)]
+                )
+            ]
+        )
+
+        let report = ReportGenerator.generate(
+            workouts: [w1, w3, w4],
+            allExercises: [deadlift],
+            start: daysAgo(30),
+            end: daysAgo(0),
+            phase: .strength,
+            bodyweightKg: 0
+        )
+
+        let lift = report.liftProgress.first { $0.exerciseName == "Deadlift" }
+
+        XCTAssertFalse(lift?.deloadSignal ?? true)
+    }
+
 
     func test_deloadSignal_firesWhenEffortRisesAndWeightStagnates() {
         let deadlift = Exercise(name: "Deadlift", category: "Big 3", isMainLift: true, prMetric: .weight)
