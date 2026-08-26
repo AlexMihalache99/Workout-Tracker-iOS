@@ -110,6 +110,7 @@ struct WorkoutListView: View {
                                 }
                                 .padding(.vertical, 4)
                             }
+                            .accessibilityIdentifier("workoutList.row.\(workout.persistentModelID)")
                             .listRowBackground(AppTheme.surface)
                             .swipeActions(edge: .leading) {
                                 Button {
@@ -131,6 +132,7 @@ struct WorkoutListView: View {
                 }
             }
             .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search by name or date")
+            .accessibilityIdentifier("workoutList.searchField")
             .navigationTitle("Workouts")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -159,6 +161,7 @@ struct WorkoutListView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityIdentifier("workoutList.newWorkoutButton")
                 }
             }
             .sheet(item: $activeWorkout) { workout in

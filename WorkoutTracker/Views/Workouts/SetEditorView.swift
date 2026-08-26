@@ -61,6 +61,7 @@ struct SetEditorView: View {
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .focused($focusedField, equals: .weight)
+                                .accessibilityIdentifier("setEditor.weightField")
                             if prMetric != .assisted {
                                 Button {
                                     showingPlateCalculator = true
@@ -78,6 +79,7 @@ struct SetEditorView: View {
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .focused($focusedField, equals: .reps)
+                            .accessibilityIdentifier("setEditor.repsField")
                     }
                     if let message = validationMessage {
                         Text(message)
@@ -93,6 +95,7 @@ struct SetEditorView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    .accessibilityIdentifier("setEditor.trackingModePicker")
 
                     if trackingMode == .rpe {
                         Stepper(value: $rpeValue, in: 5...10, step: 0.5) {
@@ -110,10 +113,12 @@ struct SetEditorView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityIdentifier("setEditor.cancelButton")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(editingSet == nil ? "Add" : "Save") { save() }
                         .disabled(!isValid)
+                        .accessibilityIdentifier("setEditor.saveButton")
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()

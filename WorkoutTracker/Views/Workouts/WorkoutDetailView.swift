@@ -29,6 +29,7 @@ struct WorkoutDetailView: View {
                     get: { workout.name ?? "" },
                     set: { workout.name = $0.isEmpty ? nil : $0 }
                 ))
+                .accessibilityIdentifier("workoutDetail.nameField")
             }
             
             Section("Summary") {
@@ -73,6 +74,7 @@ struct WorkoutDetailView: View {
                             }
                         }
                         .foregroundStyle(.primary)
+                        .accessibilityIdentifier("workoutDetail.setRow.\(set.persistentModelID)")
                     }
                     .onDelete { offsets in
                         deleteSets(from: entry, at: offsets)

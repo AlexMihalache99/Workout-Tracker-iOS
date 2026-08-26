@@ -66,6 +66,7 @@ private struct NewWorkoutFormView: View {
                         set: { workout.name = $0.isEmpty ? nil : $0 }
                     ))
                     .focused($nameFieldFocused)
+                    .accessibilityIdentifier("newWorkout.nameField")
                     DatePicker("Date", selection: Binding(
                         get: { workout.date },
                         set: { workout.date = $0 }
@@ -85,6 +86,7 @@ private struct NewWorkoutFormView: View {
                 } label: {
                     Label("Add Exercise", systemImage: "plus")
                 }
+                .accessibilityIdentifier("newWorkout.addExerciseButton")
             }
             .navigationTitle("New Workout")
             .navigationBarTitleDisplayMode(.inline)
@@ -118,6 +120,7 @@ private struct NewWorkoutFormView: View {
                                 showingDiscardConfirmation = true
                             }
                         }
+                        .accessibilityIdentifier("newWorkout.discardButton")
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -142,6 +145,7 @@ private struct NewWorkoutFormView: View {
                         dismiss()
                     }
                     .disabled(!session.isReadyToSave)
+                    .accessibilityIdentifier("newWorkout.saveButton")
                 }
             }
             .sheet(isPresented: $showingExercisePicker) {
@@ -309,6 +313,7 @@ private struct NewWorkoutFormView: View {
             .buttonStyle(.bordered)
             .controlSize(.regular)
             .fixedSize()
+            .accessibilityIdentifier("newWorkout.warmupSuggestButton.\(entry.persistentModelID)")
 
             Button {
                 setEditorTarget = SetEditorTarget(entry: entry, type: .warmup)
@@ -321,6 +326,7 @@ private struct NewWorkoutFormView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.regular)
+            .accessibilityIdentifier("newWorkout.warmupButton.\(entry.persistentModelID)")
 
             Menu {
                 Button("90s rest") { pendingRestDuration = 90 }
@@ -340,6 +346,7 @@ private struct NewWorkoutFormView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.regular)
+            .accessibilityIdentifier("newWorkout.workingSetButton.\(entry.persistentModelID)")
         }
     }
 }

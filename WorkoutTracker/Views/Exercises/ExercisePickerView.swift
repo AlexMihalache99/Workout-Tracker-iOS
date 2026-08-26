@@ -70,16 +70,19 @@ struct ExercisePickerView: View {
                     }
                     .foregroundStyle(AppTheme.textPrimary)
                     .listRowBackground(AppTheme.surface)
+                    .accessibilityIdentifier("exercisePicker.row.\(exercise.name)")
                 }
             }
             .scrollContentBackground(.hidden)
             .background(AppTheme.background)
             .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search or add an exercise")
+            .accessibilityIdentifier("exercisePicker.searchField")
             .navigationTitle("Select Exercise")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityIdentifier("exercisePicker.cancelButton")
                 }
             }
             .overlay {
