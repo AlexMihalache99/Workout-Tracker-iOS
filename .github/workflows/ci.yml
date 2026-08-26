@@ -23,7 +23,7 @@ jobs:
       - name: Install xcbeautify
         run: brew install xcbeautify
 
-            - name: Create an iPhone simulator matching this Xcode's SDK
+      - name: Create an iPhone simulator matching this Xcode's SDK
         id: sim
         run: |
           echo "--- SDKs supported by the active Xcode ---"
