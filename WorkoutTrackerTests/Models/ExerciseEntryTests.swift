@@ -56,4 +56,47 @@ final class ExerciseEntryTests: XCTestCase {
 
         XCTAssertNil(entry.averageRPE)
     }
+
+    func test_totalTrainingVolume_weightMetric_sameAsRawVolume() {
+        let exercise = Exercise(name: "Deadlift", category: "Big 3", isMainLift: true, prMetric: .weight)
+        let entry = ExerciseEntry(exercise: exercise)
+        entry.sets = [SetEntry(setType: .working, setNumber: 1, weight: 100, reps: 5)]
+
+        XCTAssertEqual(entry.totalTrainingVolume(bodyweightKg: 80), 500)
+    }
+
+    func test_totalTrainingVolume_repsMetric_usesBodyweightForZeroWeightSets() {
+        let exercise = Exercise(name: "Chin-Up", category: "Accessory", isMainLift: false, prMetric: .reps)
+        let entry = ExerciseEntry(exercise: exercise)
+        entry.sets = [SetEntry(setType: .working, setNumber: 1, weight: 0, reps: 10)]
+
+        // Old totalVolume would report 0 here -- this is the bug being fixed
+        XCTAssertEqual(entry.totalTrainingVolume(bodyweightKg: 80), 800)
+    }
+
+    func test_totalTrainingVolume_repsMetric_addsExternalWeightToBodyweight() {
+        let exercise = Exercise(name: "Weighted Pull-Up", category: "Accessory", isMainLift: false, prMetric: .reps)
+        let entry = ExerciseEntry(exercise: exercise)
+        entry.sets = [SetEntry(setType: .working, setNumber: 1, weight: 10, reps: 6)]
+
+        XCTAssertEqual(entry.totalTrainingVolume(bodyweightKg: 80), (80 + 10) * 6)
+    }
+
+    func test_totalTrainingVolume_assistedMetric_subtractsAssistanceFromBodyweight() {
+        let exercise = Exercise(name: "Assisted Pull-Up", category: "Accessory", isMainLift: false, prMetric: .assisted)
+        let entry = ExerciseEntry(exercise: exercise)
+        entry.sets = [SetEntry(setType: .working, setNumber: 1, weight: 30, reps: 10)]
+
+        // Old totalVolume would report 300 (30 x 10) and INCREASE with more assistance --
+        // this confirms the corrected, inverted relationship: more assistance = less load
+        XCTAssertEqual(entry.totalTrainingVolume(bodyweightKg: 80), (80 - 30) * 10)
+    }
+
+    func test_totalTrainingVolume_fallsBackToRawVolumeWhenBodyweightNotSet() {
+        let exercise = Exercise(name: "Chin-Up", category: "Accessory", isMainLift: false, prMetric: .reps)
+        let entry = ExerciseEntry(exercise: exercise)
+        entry.sets = [SetEntry(setType: .working, setNumber: 1, weight: 0, reps: 10)]
+
+        XCTAssertEqual(entry.totalTrainingVolume(bodyweightKg: 0), entry.totalVolume)
+    }
 }

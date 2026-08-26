@@ -36,6 +36,10 @@ final class Workout {
     var totalVolume: Double {
         exercises.reduce(0) { $0 + $1.totalVolume }
     }
+    
+    func totalTrainingVolume(bodyweightKg: Double) -> Double {
+        exercises.reduce(0) { $0 + $1.totalTrainingVolume(bodyweightKg: bodyweightKg) }
+    }
 
     var durationMinutes: Int? {
         guard let start = sessionStartTime, let end = sessionEndTime else { return nil }

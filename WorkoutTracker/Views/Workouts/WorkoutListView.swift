@@ -13,6 +13,7 @@ struct WorkoutListView: View {
     @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
     @Query(sort: \Exercise.name) private var allExercises: [Exercise]
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    @AppStorage("bodyweightKg") private var bodyweightKg: Double = 0
     private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
 
     @State private var activeWorkout: Workout?
@@ -103,7 +104,7 @@ struct WorkoutListView: View {
                                             .font(.headline)
                                             .foregroundStyle(AppTheme.textPrimary)
                                     }
-                                    let vol = weightUnit.fromKg(workout.totalVolume)
+                                    let vol = weightUnit.fromKg(workout.totalTrainingVolume(bodyweightKg: bodyweightKg))
                                     Text("\(workout.totalWorkingSets) sets · \(workout.totalReps) reps · \(Int(vol)) \(weightUnit.label) volume")
                                         .font(.caption)
                                         .foregroundStyle(AppTheme.textSecondary)

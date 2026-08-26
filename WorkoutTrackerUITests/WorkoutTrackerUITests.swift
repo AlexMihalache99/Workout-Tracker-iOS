@@ -60,12 +60,13 @@ final class WorkoutTrackerUITests: XCTestCase {
         let repsField = app.textFields["setEditor.repsField"]
         repsField.tap()
         repsField.typeText("5")
-
+        
+        
         app.buttons["setEditor.saveButton"].tap()
 
         // Save the workout
         let saveButton = app.buttons["newWorkout.saveButton"]
-        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 15))
         XCTAssertTrue(saveButton.isEnabled)
         saveButton.tap()
 

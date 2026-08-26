@@ -14,6 +14,7 @@ struct WorkoutDetailView: View {
 
     @State private var setEditorTarget: SetEditorTarget?
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    @AppStorage("bodyweightKg") private var bodyweightKg: Double = 0
     private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
 
     private struct SetEditorTarget: Identifiable {
@@ -39,7 +40,7 @@ struct WorkoutDetailView: View {
                 }
                 LabeledContent("Total Working Sets", value: "\(workout.totalWorkingSets)")
                 LabeledContent("Total Reps", value: "\(workout.totalReps)")
-                LabeledContent("Total Volume", value: "\(Int(workout.totalVolume)) kg")
+                LabeledContent("Total Volume", value: "\(Int(workout.totalTrainingVolume(bodyweightKg: bodyweightKg))) kg")
             }
 
             Section("Notes") {
@@ -89,7 +90,7 @@ struct WorkoutDetailView: View {
                         }
                     }
                 } footer: {
-                    Text("\(entry.workingSets.count) working sets · \(entry.totalReps) reps · \(Int(weightUnit.fromKg(entry.totalVolume))) \(weightUnit.label) volume")
+                    Text("\(entry.workingSets.count) working sets · \(entry.totalReps) reps · \(Int(entry.totalTrainingVolume(bodyweightKg: bodyweightKg))) kg volume")
                 }
             }
         }

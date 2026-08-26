@@ -34,11 +34,30 @@ final class ExerciseEntry {
     var totalVolume: Double {
         workingSets.reduce(0) { $0 + ($1.weight * Double($1.reps)) }
     }
-    
+
+    func totalTrainingVolume(bodyweightKg: Double) -> Double {
+        guard let metric = exercise?.prMetric else { return totalVolume }
+
+        switch metric {
+        case .weight:
+            return totalVolume
+        case .reps:
+            guard bodyweightKg > 0 else { return totalVolume }
+            return workingSets.reduce(0) { partial, set in
+                partial + ((bodyweightKg + set.weight) * Double(set.reps))
+            }
+        case .assisted:
+            guard bodyweightKg > 0 else { return totalVolume }
+            return workingSets.reduce(0) { partial, set in
+                partial + (max(bodyweightKg - set.weight, 0) * Double(set.reps))
+            }
+        }
+    }
+
     var averageRPE: Double? {
-            let rpes = workingSets.compactMap { $0.rpe }
-            guard !rpes.isEmpty else { return nil }
-            return rpes.reduce(0, +) / Double(rpes.count)
+        let rpes = workingSets.compactMap { $0.rpe }
+        guard !rpes.isEmpty else { return nil }
+        return rpes.reduce(0, +) / Double(rpes.count)
     }
     
     var sortedSets: [SetEntry] {
