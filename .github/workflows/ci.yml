@@ -23,6 +23,13 @@ jobs:
       - name: Install xcbeautify
         run: brew install xcbeautify
 
+      - name: Show build settings relevant to destination eligibility
+        run: |
+          xcodebuild -showBuildSettings \
+            -project WorkoutTracker.xcodeproj \
+            -scheme WorkoutTracker \
+            | grep -E "IPHONEOS_DEPLOYMENT_TARGET|SUPPORTED_PLATFORMS|TARGETED_DEVICE_FAMILY|PRODUCT_NAME"
+
       - name: Create an iPhone simulator matching this Xcode's SDK
         id: sim
         run: |
