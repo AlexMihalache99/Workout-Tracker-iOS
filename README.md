@@ -138,13 +138,13 @@ P0 — correctness
 - [x] Test assisted-load calculations.
 - [x] Test report date boundaries.
 - [x] Test RPE/RIR invariants.
-- Test workout discard/save behavior.
+- [x] Test workout discard/save behaviour.
   
 P1 — architecture
-- Extract NewWorkoutView business logic.
-- Create a WorkoutSession/draft abstraction.
-- Extract HealthKit sync from the view.
-- Move calculators/report generation out of Views.
+- [x] Extract NewWorkoutView business logic.
+- [x] Create a WorkoutSession/draft abstraction.
+- [x] Extract HealthKit sync from the view.
+- [x] Move calculators/report generation out of Views.
   
 P2 — product correctness
 - Track real workout start/end times.
