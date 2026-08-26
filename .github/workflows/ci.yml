@@ -60,8 +60,15 @@ jobs:
 
           UDID=$(xcrun simctl create "CI-iPhone" "$DEVICETYPE_ID" "$RUNTIME_ID")
           echo "Created simulator UDID: $UDID"
-          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
+          echo "--- Booting simulator ---"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+
+          echo "--- Confirming device is now visible ---"
+          xcrun simctl list devices | grep "$UDID"
+
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
       - name: Build and test
         run: |
           xcodebuild test \
