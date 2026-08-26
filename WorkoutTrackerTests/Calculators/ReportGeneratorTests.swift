@@ -301,4 +301,37 @@ final class ReportGeneratorTests: XCTestCase {
         let lift = report.liftProgress.first { $0.exerciseName == "Deadlift" }
         XCTAssertFalse(lift?.deloadSignal ?? true)
     }
+    
+    func test_deloadSignal_doesNotFireWhenWeeksAreNotConsecutive() {
+        let deadlift = Exercise(name: "Deadlift", category: "Big 3", isMainLift: true, prMetric: .weight)
+        // Weeks at day -28, -21, -7 (missing week at -14) -- a real gap
+        let w1 = makeWorkout(date: daysAgo(28), exercises: [makeEntry(exercise: deadlift, sets: [makeSet(.working, 140, 3, rpe: 7.0)])])
+        let w2 = makeWorkout(date: daysAgo(21), exercises: [makeEntry(exercise: deadlift, sets: [makeSet(.working, 140, 3, rpe: 8.0)])])
+        let w3 = makeWorkout(date: daysAgo(7), exercises: [makeEntry(exercise: deadlift, sets: [makeSet(.working, 140, 3, rpe: 9.0)])])
+
+        let report = ReportGenerator.generate(
+            workouts: [w1, w2, w3], allExercises: [deadlift],
+            start: daysAgo(30), end: daysAgo(0), phase: .strength, bodyweightKg: 0
+        )
+
+        let lift = report.liftProgress.first { $0.exerciseName == "Deadlift" }
+        XCTAssertFalse(lift?.deloadSignal ?? true)
+    }
+
+    func test_deloadSignal_doesNotFireWhenMidWindowWeightIncreases() {
+        let deadlift = Exercise(name: "Deadlift", category: "Big 3", isMainLift: true, prMetric: .weight)
+        let w1 = makeWorkout(date: daysAgo(21), exercises: [makeEntry(exercise: deadlift, sets: [makeSet(.working, 100, 3, rpe: 7.0)])])
+        let w2 = makeWorkout(date: daysAgo(14), exercises: [makeEntry(exercise: deadlift, sets: [makeSet(.working, 105, 3, rpe: 8.0)])])
+        let w3 = makeWorkout(date: daysAgo(7), exercises: [makeEntry(exercise: deadlift, sets: [makeSet(.working, 100, 3, rpe: 9.0)])])
+
+        let report = ReportGenerator.generate(
+            workouts: [w1, w2, w3], allExercises: [deadlift],
+            start: daysAgo(21), end: daysAgo(0), phase: .strength, bodyweightKg: 0
+        )
+
+        // Old implementation (first vs. last only: 100 <= 100) would have
+        // incorrectly fired here despite the real bump in week 2.
+        let lift = report.liftProgress.first { $0.exerciseName == "Deadlift" }
+        XCTAssertFalse(lift?.deloadSignal ?? true)
+    }
 }
