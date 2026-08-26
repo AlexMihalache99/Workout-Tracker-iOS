@@ -130,3 +130,31 @@ Since the app has no cloud sync and all data lives only in local SwiftData stora
 Typical update flow: **Export Backup** before updating or reinstalling → **Import Backup → Replace All Data** afterward to restore everything. Note that a backup taken before the PR-metric feature existed won't include tracking-metric choices for individual exercises — re-apply those from Exercise Detail after such an import; main lifts recover automatically via the migration.
 ## Notes
 Weights are stored in kilograms internally. The selected display unit only changes how values are entered and presented, so switching between kg and lb does not rewrite past workout data.
+# Future Work
+P0 — correctness
+- Add unit tests for all calculation logic.
+- Test backup import/export thoroughly.
+- Test PR calculations.
+- Test assisted-load calculations.
+- Test report date boundaries.
+- Test RPE/RIR invariants.
+- Test workout discard/save behavior.
+  
+P1 — architecture
+- Extract NewWorkoutView business logic.
+- Create a WorkoutSession/draft abstraction.
+- Extract HealthKit sync from the view.
+- Move calculators/report generation out of Views.
+  
+P2 — product correctness
+- Track real workout start/end times.
+- Improve report semantics around "best" vs "toughest".
+- Make estimated-1RM selection consistent.
+- Handle HealthKit failures visibly.
+  
+P3 — polish
+- Add accessibility identifiers.
+- Add UI tests for the core workout flow.
+- Add CI with xcodebuild test.
+- Add screenshots/demo GIFs to README.
+- Add release/versioning documentation.
