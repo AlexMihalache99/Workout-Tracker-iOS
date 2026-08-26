@@ -153,8 +153,8 @@ P2 — product correctness
 - [x] Handle HealthKit failures visibly.
   
 P3 — polish
-- Add accessibility identifiers.
-- Add UI tests for the core workout flow.
-- Add CI with xcodebuild test.
+- [x] Add accessibility identifiers.
+- [x] Add UI tests for the core workout flow.
+- [x] Add CI with xcodebuild test.
 - Add screenshots/demo GIFs to README.
 - Add release/versioning documentation.
