@@ -23,18 +23,30 @@ jobs:
       - name: Install xcbeautify
         run: brew install xcbeautify
 
-      - name: Create an iPhone simulator
+            - name: Create an iPhone simulator matching this Xcode's SDK
         id: sim
         run: |
+          echo "--- SDKs supported by the active Xcode ---"
+          xcodebuild -showsdks
+
+          SDK_VERSION=$(xcodebuild -showsdks \
+            | grep -i 'Simulator - iOS' \
+            | grep -o -E '[0-9]+\.[0-9]+' \
+            | head -n 1)
+          if [ -z "$SDK_VERSION" ]; then
+            echo "Could not determine iOS Simulator SDK version." >&2
+            exit 1
+          fi
+          echo "Active Xcode supports iOS Simulator SDK: $SDK_VERSION"
+
           echo "--- Available iOS runtimes ---"
           xcrun simctl list runtimes
 
           RUNTIME_ID=$(xcrun simctl list runtimes \
-            | grep -E '^iOS ' \
-            | tail -n 1 \
+            | grep -E "^iOS $SDK_VERSION " \
             | grep -o -E 'com\.apple\.CoreSimulator\.SimRuntime\.iOS[^ ]*')
           if [ -z "$RUNTIME_ID" ]; then
-            echo "No iOS runtime found." >&2
+            echo "No installed runtime matches iOS $SDK_VERSION." >&2
             exit 1
           fi
           echo "Using runtime: $RUNTIME_ID"
@@ -71,6 +83,7 @@ jobs:
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
       - name: Build and test
         run: |
+          set -o pipefail
           xcodebuild test \
             -project WorkoutTracker.xcodeproj \
             -scheme WorkoutTracker \
