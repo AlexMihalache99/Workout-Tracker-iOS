@@ -134,13 +134,13 @@ Weights are stored in kilograms internally. The selected display unit only chang
 # Known Issues / Remediation Backlog
 
 ### P0 — Correctness & data integrity
-- [ ] Save failures are swallowed (`try? modelContext.save()`) — success haptic/dismiss fire even if persistence fails
-- [ ] Workout volume is wrong for bodyweight exercises (weight=0 → volume=0) and backwards for assisted exercises (assistance × reps instead of effective load × reps)
-- [ ] Backup export omits `prMetric` — PR tracking choices (Reps/Assisted) don't survive export/import
-- [ ] Backup export omits `supersetGroupID` — superset pairings don't survive export/import
-- [ ] Backup import silently skips exercise entries with no catalog match — no count/warning shown to the user
-- [ ] Backup merge duplicates workouts on repeat import — no identity-based dedup
-- [ ] Deload signal doesn't verify the 3 weeks it compares are actually consecutive calendar weeks
+- [x] Save failures are swallowed (`try? modelContext.save()`) — success haptic/dismiss fire even if persistence fails
+- [x] Workout volume is wrong for bodyweight exercises (weight=0 → volume=0) and backwards for assisted exercises (assistance × reps instead of effective load × reps)
+- [x] Backup export omits `prMetric` — PR tracking choices (Reps/Assisted) don't survive export/import
+- [x] Backup export omits `supersetGroupID` — superset pairings don't survive export/import
+- [x] Backup import silently skips exercise entries with no catalog match — no count/warning shown to the user
+- [x] Backup merge duplicates workouts on repeat import — no identity-based dedup
+- [x] Deload signal doesn't verify the 3 weeks it compares are actually consecutive calendar weeks
 
 ### P1 — Robustness
 - [ ] `SetEntry` has no model-level invariant enforcement (RPE 0.5–10, RIR 0–5, mutually exclusive) — only the UI constrains input
