@@ -132,12 +132,12 @@ Typical update flow: **Export Backup** before updating or reinstalling → **Imp
 Weights are stored in kilograms internally. The selected display unit only changes how values are entered and presented, so switching between kg and lb does not rewrite past workout data.
 # Future Work
 P0 — correctness
-- Add unit tests for all calculation logic.
-- Test backup import/export thoroughly.
-- Test PR calculations.
-- Test assisted-load calculations.
-- Test report date boundaries.
-- Test RPE/RIR invariants.
+- [x] Add unit tests for all calculation logic.
+- [x] Test backup import/export thoroughly.
+- [x] Test PR calculations.
+- [x] Test assisted-load calculations.
+- [x] Test report date boundaries.
+- [x] Test RPE/RIR invariants.
 - Test workout discard/save behavior.
   
 P1 — architecture
