@@ -147,10 +147,10 @@ P1 — architecture
 - [x] Move calculators/report generation out of Views.
   
 P2 — product correctness
-- Track real workout start/end times.
-- Improve report semantics around "best" vs "toughest".
-- Make estimated-1RM selection consistent.
-- Handle HealthKit failures visibly.
+- [x] Track real workout start/end times.
+- [x] Improve report semantics around "best" vs "toughest".
+- [x] Make estimated-1RM selection consistent.
+- [x] Handle HealthKit failures visibly.
   
 P3 — polish
 - Add accessibility identifiers.
