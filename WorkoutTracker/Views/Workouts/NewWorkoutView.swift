@@ -8,50 +8,53 @@
 import SwiftUI
 import UIKit
 import SwiftData
+import Combine
 
 struct NewWorkoutView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    @Bindable var workout: Workout
+    let workout: Workout
+    @State private var session: WorkoutSession?
+
+    init(workout: Workout) {
+        self.workout = workout
+    }
+
+    var body: some View {
+        Group {
+            if let session {
+                NewWorkoutFormView(workout: workout, session: session)
+            } else {
+                ProgressView()
+                    .onAppear {
+                        session = WorkoutSession(workout: workout, context: modelContext)
+                    }
+            }
+        }
+    }
+}
+
+private struct NewWorkoutFormView: View {
+    @Environment(\.dismiss) private var dismiss
+    let workout: Workout
+    @ObservedObject var session: WorkoutSession   // <- the actual fix: reactive subscription lives here
 
     @State private var showingExercisePicker = false
     @State private var setEditorTarget: SetEditorTarget?
     @State private var showingDiscardConfirmation = false
     @State private var pendingRestDuration: Int? = nil
     @State private var warmupSuggestionEntry: ExerciseEntry?
-    @State private var isPairingMode = false
-    @State private var isSavingWorkout = false
-    @State private var selectedForPairing: Set<PersistentIdentifier> = []
 
     @StateObject private var restTimer = RestTimerManager()
     @AppStorage("restTimerDuration") private var restTimerDuration: Int = 90
-    @FocusState private var nameFieldFocused: Bool
-    
     @AppStorage("healthSyncEnabled") private var healthSyncEnabled: Bool = false
+    @FocusState private var nameFieldFocused: Bool
 
     private struct SetEditorTarget: Identifiable {
         let id = UUID()
         let entry: ExerciseEntry
         let type: SetType
-    }
-
-    private var displayGroups: [[ExerciseEntry]] {
-        var result: [[ExerciseEntry]] = []
-        var seen: Set<PersistentIdentifier> = []
-
-        for entry in workout.exercises {
-            if seen.contains(entry.persistentModelID) { continue }
-            if let groupID = entry.supersetGroupID {
-                let partners = workout.exercises.filter { $0.supersetGroupID == groupID }
-                result.append(partners)
-                partners.forEach { seen.insert($0.persistentModelID) }
-            } else {
-                result.append([entry])
-                seen.insert(entry.persistentModelID)
-            }
-        }
-        return result
     }
 
     var body: some View {
@@ -63,10 +66,13 @@ struct NewWorkoutView: View {
                         set: { workout.name = $0.isEmpty ? nil : $0 }
                     ))
                     .focused($nameFieldFocused)
-                    DatePicker("Date", selection: $workout.date, displayedComponents: [.date, .hourAndMinute])
+                    DatePicker("Date", selection: Binding(
+                        get: { workout.date },
+                        set: { workout.date = $0 }
+                    ), displayedComponents: [.date, .hourAndMinute])
                 }
 
-                ForEach(Array(displayGroups.enumerated()), id: \.offset) { _, group in
+                ForEach(Array(session.displayGroups.enumerated()), id: \.offset) { _, group in
                     if group.count == 2 {
                         supersetSection(group)
                     } else if let entry = group.first {
@@ -84,28 +90,28 @@ struct NewWorkoutView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if isPairingMode {
-                        Button(selectedForPairing.count == 2 ? "Confirm" : "Select 2") {
-                            confirmPairing()
+                    if session.isPairingMode {
+                        Button(session.selectedForPairing.count == 2 ? "Confirm" : "Select 2") {
+                            session.confirmPairing()
                         }
-                        .disabled(selectedForPairing.count != 2)
-                    } else if workout.exercises.count >= 2 {
+                        .disabled(session.selectedForPairing.count != 2)
+                    } else if session.canEnterPairingMode {
                         Button {
-                            isPairingMode = true
+                            session.isPairingMode = true
                         } label: {
                             Image(systemName: "link")
                         }
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    if isPairingMode {
+                    if session.isPairingMode {
                         Button("Cancel") {
-                            isPairingMode = false
-                            selectedForPairing.removeAll()
+                            session.cancelPairing()
                         }
                     } else {
                         Button("Discard") {
                             if workout.exercises.isEmpty {
+                                session.discard()
                                 restTimer.cancel()
                                 dismiss()
                             } else {
@@ -116,16 +122,27 @@ struct NewWorkoutView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        Task { await saveWorkout() }
+                        guard let result = session.save() else { return }
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        restTimer.cancel()
+
+                        if healthSyncEnabled {
+                            let end = result.start.addingTimeInterval(TimeInterval(result.sets * 180))
+                            Task {
+                                try? await HealthKitManager.shared.saveWorkout(
+                                    start: result.start, end: end,
+                                    workingSets: result.sets, totalVolumeKg: result.volumeKg
+                                )
+                            }
+                        }
+                        dismiss()
                     }
-                    .disabled(workout.exercises.isEmpty || isPairingMode || isSavingWorkout)
+                    .disabled(!session.isReadyToSave)
                 }
             }
             .sheet(isPresented: $showingExercisePicker) {
                 ExercisePickerView { exercise in
-                    let entry = ExerciseEntry(exercise: exercise)
-                    entry.workout = workout
-                    workout.exercises.append(entry)
+                    session.addExercise(exercise)
                 }
             }
             .sheet(item: $setEditorTarget, onDismiss: {
@@ -133,26 +150,16 @@ struct NewWorkoutView: View {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }) { target in
                 let nextNumber = target.entry.sets.filter { $0.setType == target.type }.count + 1
-                SetEditorView(
-                    setType: target.type,
-                    nextSetNumber: nextNumber,
-                    onSave: { newSet in
-                        newSet.exerciseEntry = target.entry
-                        target.entry.sets.append(newSet)
-                        if target.type == .working {
-                            if shouldStartRestTimer(after: target.entry) {
-                                restTimer.start(duration: pendingRestDuration ?? restTimerDuration)
-                            }
-                        }
-                    },
-                    prMetric: target.entry.exercise?.prMetric
-                )
+                SetEditorView(setType: target.type, nextSetNumber: nextNumber, prMetric: target.entry.exercise?.prMetric) { newSet in
+                    session.addSet(newSet, to: target.entry)
+                    if target.type == .working, session.shouldStartRestTimer(after: target.entry) {
+                        restTimer.start(duration: pendingRestDuration ?? restTimerDuration)
+                    }
+                }
             }
             .sheet(item: $warmupSuggestionEntry) { entry in
                 WarmupSuggestionView(entry: entry) { newSets in
-                    for set in newSets {
-                        entry.sets.append(set)
-                    }
+                    session.addWarmupSets(newSets, to: entry)
                 }
             }
             .overlay {
@@ -160,10 +167,9 @@ struct NewWorkoutView: View {
                     DeleteConfirmationOverlay(
                         title: "Discard Workout?",
                         message: "You'll lose everything logged in this workout.",
+                        confirmLabel: "Discard",
                         onDelete: {
-                            if workout.modelContext != nil {
-                                modelContext.delete(workout)
-                            }
+                            session.discard()
                             restTimer.cancel()
                             showingDiscardConfirmation = false
                             dismiss()
@@ -191,61 +197,6 @@ struct NewWorkoutView: View {
         }
     }
 
-    private func saveWorkout() async {
-        guard !isSavingWorkout else { return }
-
-        isSavingWorkout = true
-        defer { isSavingWorkout = false }
-
-        modelContext.insert(workout)
-        try? modelContext.save()
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        restTimer.cancel()
-
-        if healthSyncEnabled {
-            let sets = workout.totalWorkingSets
-            let volume = workout.totalVolume
-            let start = workout.date
-            let end = workout.date.addingTimeInterval(TimeInterval(sets * 180))
-
-            do {
-                try await HealthKitManager.shared.saveWorkout(start: start, end: end, workingSets: sets, totalVolumeKg: volume)
-            } catch {
-                print("Health sync failed: \(error.localizedDescription)")
-            }
-        }
-
-        dismiss()
-    }
-
-    private func shouldStartRestTimer(after entry: ExerciseEntry) -> Bool {
-        guard let groupID = entry.supersetGroupID else { return true }
-        let partners = workout.exercises.filter { $0.supersetGroupID == groupID && $0.persistentModelID != entry.persistentModelID }
-        guard let partner = partners.first else { return true }
-
-        let entryWorkingCount = entry.workingSets.count
-        let partnerWorkingCount = partner.workingSets.count
-        return partnerWorkingCount >= entryWorkingCount
-    }
-
-    private func deleteSets(from entry: ExerciseEntry, at offsets: IndexSet) {
-        let sorted = entry.sortedSets
-        for index in offsets {
-            let setToDelete = sorted[index]
-            if setToDelete.modelContext != nil {
-                modelContext.delete(setToDelete)
-            }
-            entry.sets.removeAll { $0.persistentModelID == setToDelete.persistentModelID }
-        }
-    }
-
-    private func deleteExerciseEntry(_ entry: ExerciseEntry) {
-        if entry.modelContext != nil {
-            modelContext.delete(entry)
-        }
-        workout.exercises.removeAll { $0.persistentModelID == entry.persistentModelID }
-    }
-
     @ViewBuilder
     private func exerciseSection(_ entry: ExerciseEntry) -> some View {
         Section {
@@ -253,7 +204,7 @@ struct NewWorkoutView: View {
                 SetRow(set: set)
             }
             .onDelete { offsets in
-                deleteSets(from: entry, at: offsets)
+                session.deleteSets(from: entry, at: offsets)
             }
             setActionButtons(for: entry)
         } header: {
@@ -275,7 +226,7 @@ struct NewWorkoutView: View {
                 .foregroundStyle(AppTheme.accent)
 
                 Button("Unlink") {
-                    unlinkSuperset(group)
+                    session.unlinkSuperset(group)
                 }
                 .font(.caption2)
             }
@@ -301,19 +252,19 @@ struct NewWorkoutView: View {
     private func exerciseHeader(_ entry: ExerciseEntry, showPairCheckbox: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                if isPairingMode && showPairCheckbox {
+                if session.isPairingMode && showPairCheckbox {
                     Button {
-                        togglePairingSelection(entry)
+                        session.togglePairingSelection(entry)
                     } label: {
-                        Image(systemName: selectedForPairing.contains(entry.persistentModelID) ? "checkmark.circle.fill" : "circle")
+                        Image(systemName: session.selectedForPairing.contains(entry.persistentModelID) ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(AppTheme.accent)
                     }
                 }
                 Text(entry.exercise?.name ?? "Unknown Exercise")
                 Spacer()
-                if !isPairingMode {
+                if !session.isPairingMode {
                     Button {
-                        deleteExerciseEntry(entry)
+                        session.deleteExerciseEntry(entry)
                     } label: {
                         Image(systemName: "trash")
                             .foregroundStyle(PlateColor.deadlift)
@@ -385,30 +336,6 @@ struct NewWorkoutView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.regular)
-        }
-    }
-
-    private func togglePairingSelection(_ entry: ExerciseEntry) {
-        if selectedForPairing.contains(entry.persistentModelID) {
-            selectedForPairing.remove(entry.persistentModelID)
-        } else if selectedForPairing.count < 2 {
-            selectedForPairing.insert(entry.persistentModelID)
-        }
-    }
-
-    private func confirmPairing() {
-        guard selectedForPairing.count == 2 else { return }
-        let groupID = UUID()
-        for entry in workout.exercises where selectedForPairing.contains(entry.persistentModelID) {
-            entry.supersetGroupID = groupID
-        }
-        selectedForPairing.removeAll()
-        isPairingMode = false
-    }
-
-    private func unlinkSuperset(_ group: [ExerciseEntry]) {
-        for entry in group {
-            entry.supersetGroupID = nil
         }
     }
 }
