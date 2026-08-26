@@ -130,31 +130,26 @@ Since the app has no cloud sync and all data lives only in local SwiftData stora
 Typical update flow: **Export Backup** before updating or reinstalling → **Import Backup → Replace All Data** afterward to restore everything. Note that a backup taken before the PR-metric feature existed won't include tracking-metric choices for individual exercises — re-apply those from Exercise Detail after such an import; main lifts recover automatically via the migration.
 ## Notes
 Weights are stored in kilograms internally. The selected display unit only changes how values are entered and presented, so switching between kg and lb does not rewrite past workout data.
-# Future Work
-P0 — correctness
-- [x] Add unit tests for all calculation logic.
-- [x] Test backup import/export thoroughly.
-- [x] Test PR calculations.
-- [x] Test assisted-load calculations.
-- [x] Test report date boundaries.
-- [x] Test RPE/RIR invariants.
-- [x] Test workout discard/save behaviour.
-  
-P1 — architecture
-- [x] Extract NewWorkoutView business logic.
-- [x] Create a WorkoutSession/draft abstraction.
-- [x] Extract HealthKit sync from the view.
-- [x] Move calculators/report generation out of Views.
-  
-P2 — product correctness
-- [x] Track real workout start/end times.
-- [x] Improve report semantics around "best" vs "toughest".
-- [x] Make estimated-1RM selection consistent.
-- [x] Handle HealthKit failures visibly.
-  
-P3 — polish
-- [x] Add accessibility identifiers.
-- [x] Add UI tests for the core workout flow.
-- [x] Add CI with xcodebuild test.
-- Add screenshots/demo GIFs to README.
-- Add release/versioning documentation.
+
+# Known Issues / Remediation Backlog
+
+### P0 — Correctness & data integrity
+- [ ] Save failures are swallowed (`try? modelContext.save()`) — success haptic/dismiss fire even if persistence fails
+- [ ] Workout volume is wrong for bodyweight exercises (weight=0 → volume=0) and backwards for assisted exercises (assistance × reps instead of effective load × reps)
+- [ ] Backup export omits `prMetric` — PR tracking choices (Reps/Assisted) don't survive export/import
+- [ ] Backup export omits `supersetGroupID` — superset pairings don't survive export/import
+- [ ] Backup import silently skips exercise entries with no catalog match — no count/warning shown to the user
+- [ ] Backup merge duplicates workouts on repeat import — no identity-based dedup
+- [ ] Deload signal doesn't verify the 3 weeks it compares are actually consecutive calendar weeks
+
+### P1 — Robustness
+- [ ] `SetEntry` has no model-level invariant enforcement (RPE 0.5–10, RIR 0–5, mutually exclusive) — only the UI constrains input
+- [ ] Superset groups with >2 entries would silently drop exercises from `NewWorkoutView` (currently unreachable via UI, but the model allows it)
+- [ ] Consistency calculator's average-per-week can be inflated by future-dated workouts (no upper bound on the window filter)
+- [ ] Deload signal compares only first/last week in the window, not full monotonic trend — a mid-window weight bump can be missed
+- [ ] Exercise identity is matched by name in several places (`ReportGenerator`, filters) rather than stable identifier — fragile if renaming exercises is ever supported
+
+### P2 — Polish / lower priority
+- [ ] Plate calculator assumes unlimited plate inventory
+- [ ] Warm-up ramp rounding can produce duplicate weights across steps for light targets
+- [ ] `displayGroups` and report generation re-scan collections rather than indexing once (non-issue at personal-project data scale, but worth noting)
