@@ -21,6 +21,9 @@ final class WorkoutSession: ObservableObject {
     init(workout: Workout, context: ModelContext) {
         self.workout = workout
         self.context = context
+        if workout.sessionStartTime == nil {
+            workout.sessionStartTime = Date()
+        }
     }
 
     // MARK: - Display grouping (standalone vs. superset pairs)
@@ -123,11 +126,6 @@ final class WorkoutSession: ObservableObject {
 
     // MARK: - Rest timer decision
 
-    /// Whether logging a working set on this entry should start the rest timer.
-    /// Standalone exercises always rest. Superset partners only rest once the
-    /// round is complete (partner has caught up to this entry's set count) --
-    /// the pairing decision (rest = 0 between paired exercises) lives here,
-    /// not in the timer itself.
     func shouldStartRestTimer(after entry: ExerciseEntry) -> Bool {
         guard let groupID = entry.supersetGroupID else { return true }
         let partners = workout.exercises.filter {
@@ -142,31 +140,24 @@ final class WorkoutSession: ObservableObject {
 
     // MARK: - Discard / Save
 
-    /// True once this workout has actually been tracked by the context --
-    /// e.g. by SwiftData's implicit relationship tracking when a persisted
-    /// Exercise gets linked in. A workout that's never been touched this way
-    /// needs no explicit delete on discard.
     var isTracked: Bool {
         workout.modelContext != nil
     }
 
-    /// Discards the workout. Safe to call whether or not the workout has
-    /// become implicitly tracked -- see the modelContext != nil guard note
-    /// in isTracked.
     func discard() {
         if isTracked {
             context.delete(workout)
         }
     }
 
-    /// Persists the workout for the first time. Returns the totals needed
-    /// for a HealthKit sync so the caller (the View) can decide whether to
-    /// fire that side effect -- WorkoutSession itself never talks to HealthKit.
     @discardableResult
-    func save() -> (start: Date, sets: Int, volumeKg: Double)? {
+    func save() -> (start: Date, end: Date, sets: Int, volumeKg: Double)? {
         guard isReadyToSave else { return nil }
+        let end = Date()
+        workout.sessionEndTime = end
         context.insert(workout)
         try? context.save()
-        return (workout.date, workout.totalWorkingSets, workout.totalVolume)
+        let start = workout.sessionStartTime ?? workout.date
+        return (start, end, workout.totalWorkingSets, workout.totalVolume)
     }
 }

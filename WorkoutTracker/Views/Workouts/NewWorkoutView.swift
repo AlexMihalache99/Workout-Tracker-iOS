@@ -127,12 +127,16 @@ private struct NewWorkoutFormView: View {
                         restTimer.cancel()
 
                         if healthSyncEnabled {
-                            let end = result.start.addingTimeInterval(TimeInterval(result.sets * 180))
                             Task {
-                                try? await HealthKitManager.shared.saveWorkout(
-                                    start: result.start, end: end,
-                                    workingSets: result.sets, totalVolumeKg: result.volumeKg
-                                )
+                                do {
+                                    try await HealthKitManager.shared.saveWorkout(
+                                        start: result.start, end: result.end,
+                                        workingSets: result.sets, totalVolumeKg: result.volumeKg
+                                    )
+                                    HealthKitManager.shared.clearSyncError()
+                                } catch {
+                                    HealthKitManager.shared.recordSyncError(error.localizedDescription)
+                                }
                             }
                         }
                         dismiss()

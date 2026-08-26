@@ -13,6 +13,8 @@ final class Workout {
     var date: Date
     var name: String?
     var notes: String?
+    var sessionStartTime: Date?
+    var sessionEndTime: Date?
 
     @Relationship(deleteRule: .cascade)
     var exercises: [ExerciseEntry] = []
@@ -23,7 +25,6 @@ final class Workout {
         self.notes = notes
     }
 
-    // Workout-level summary, computed from exercises
     var totalWorkingSets: Int {
         exercises.reduce(0) { $0 + $1.workingSets.count }
     }
@@ -34,5 +35,11 @@ final class Workout {
 
     var totalVolume: Double {
         exercises.reduce(0) { $0 + $1.totalVolume }
+    }
+
+    var durationMinutes: Int? {
+        guard let start = sessionStartTime, let end = sessionEndTime else { return nil }
+        let minutes = Int(end.timeIntervalSince(start) / 60)
+        return max(minutes, 0)
     }
 }
