@@ -143,10 +143,10 @@ Weights are stored in kilograms internally. The selected display unit only chang
 - [x] Deload signal doesn't verify the 3 weeks it compares are actually consecutive calendar weeks
 
 ### P1 — Robustness
-- [ ] `SetEntry` has no model-level invariant enforcement (RPE 0.5–10, RIR 0–5, mutually exclusive) — only the UI constrains input
-- [ ] Superset groups with >2 entries would silently drop exercises from `NewWorkoutView` (currently unreachable via UI, but the model allows it)
-- [ ] Consistency calculator's average-per-week can be inflated by future-dated workouts (no upper bound on the window filter)
-- [ ] Deload signal compares only first/last week in the window, not full monotonic trend — a mid-window weight bump can be missed
+- [x] `SetEntry` has no model-level invariant enforcement (RPE 0.5–10, RIR 0–5, mutually exclusive) — only the UI constrains input
+- [x] Superset groups with >2 entries would silently drop exercises from `NewWorkoutView` (currently unreachable via UI, but the model allows it)
+- [x] Consistency calculator's average-per-week can be inflated by future-dated workouts (no upper bound on the window filter)
+- [x] Deload signal compares only first/last week in the window, not full monotonic trend — a mid-window weight bump can be missed
 - [ ] Exercise identity is matched by name in several places (`ReportGenerator`, filters) rather than stable identifier — fragile if renaming exercises is ever supported
 
 ### P2 — Polish / lower priority
