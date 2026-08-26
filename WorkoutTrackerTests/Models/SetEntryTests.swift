@@ -65,4 +65,45 @@ final class SetEntryTests: XCTestCase {
         XCTAssertNotNil(set.exerciseEntry)
         XCTAssertEqual(set.exerciseEntry?.exercise?.name, "Deadlift")
     }
+    
+    func test_init_clampsWeightToNonNegative() {
+        let set = SetEntry(setType: .working, setNumber: 1, weight: -50, reps: 5)
+        XCTAssertEqual(set.weight, 0)
+    }
+
+    func test_init_clampsRepsToNonNegative() {
+        let set = SetEntry(setType: .working, setNumber: 1, weight: 100, reps: -3)
+        XCTAssertEqual(set.reps, 0)
+    }
+
+    func test_init_clampsRPEToValidRange() {
+        let tooHigh = SetEntry(setType: .working, setNumber: 1, weight: 100, reps: 5, rpe: 14)
+        let tooLow = SetEntry(setType: .working, setNumber: 1, weight: 100, reps: 5, rpe: 0.1)
+        XCTAssertEqual(tooHigh.rpe, 10)
+        XCTAssertEqual(tooLow.rpe, 0.5)
+    }
+
+    func test_init_clampsRIRToValidRange() {
+        let tooHigh = SetEntry(setType: .working, setNumber: 1, weight: 100, reps: 5, rir: 20)
+        let tooLow = SetEntry(setType: .working, setNumber: 1, weight: 100, reps: 5, rir: -10)
+        XCTAssertEqual(tooHigh.rir, 5)
+        XCTAssertEqual(tooLow.rir, 0)
+    }
+
+    func test_init_whenBothRPEAndRIRProvided_RPEWinsAndRIRIsCleared() {
+        let set = SetEntry(setType: .working, setNumber: 1, weight: 100, reps: 5, rpe: 8, rir: 2)
+        XCTAssertEqual(set.rpe, 8)
+        XCTAssertNil(set.rir)
+    }
+
+    func test_normalize_reclampsAfterDirectMutation() {
+        let set = SetEntry(setType: .working, setNumber: 1, weight: 100, reps: 5)
+        set.weight = -20
+        set.rpe = 99
+
+        set.normalize()
+
+        XCTAssertEqual(set.weight, 0)
+        XCTAssertEqual(set.rpe, 10)
+    }
 }
