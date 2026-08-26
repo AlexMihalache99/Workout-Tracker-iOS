@@ -91,17 +91,16 @@ jobs:
           echo "os_version=$SDK_VERSION" >> "$GITHUB_OUTPUT"
       - name: Build and test
         run: |
-            set -o pipefail
-            xcodebuild test \
-              -project WorkoutTracker.xcodeproj \
-              -scheme WorkoutTracker \
-              -destination "platform=iOS Simulator,name=CI-iPhone,OS=${{ steps.sim.outputs.os_version }}" \
-              -skipMacroValidation \
-              -only-testing:WorkoutTrackerTests \
-              -parallel-testing-enabled NO \
-              | xcbeautify --renderer github-actions
+          set -o pipefail
+          xcodebuild test \
+            -project WorkoutTracker.xcodeproj \
+            -scheme WorkoutTracker \
+            -destination "platform=iOS Simulator,name=CI-iPhone,OS=${{ steps.sim.outputs.os_version }}" \
+            -skipMacroValidation \
+            -parallel-testing-enabled NO \
+            | xcbeautify --renderer github-actions
         env:
-            NSUnbufferedIO: YES
+          NSUnbufferedIO: YES
 
       - name: Upload test results
         if: failure()
