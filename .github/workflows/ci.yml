@@ -81,13 +81,14 @@ jobs:
           xcrun simctl list devices | grep "$UDID"
 
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "os_version=$SDK_VERSION" >> "$GITHUB_OUTPUT"
       - name: Build and test
         run: |
           set -o pipefail
           xcodebuild test \
             -project WorkoutTracker.xcodeproj \
             -scheme WorkoutTracker \
-            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -destination "platform=iOS Simulator,name=CI-iPhone,OS=${{ steps.sim.outputs.os_version }}" \
             -skipMacroValidation \
             | xcbeautify --renderer github-actions
         env:
