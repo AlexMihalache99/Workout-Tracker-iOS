@@ -17,7 +17,9 @@ struct WorkoutTrackerApp: App {
             SetEntry.self,
             Exercise.self
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+
+        let isUITesting = ProcessInfo.processInfo.arguments.contains("-UITestMode")
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: isUITesting)
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
@@ -30,7 +32,9 @@ struct WorkoutTrackerApp: App {
         WindowGroup {
             ContentView()
                 .onAppear {
-                    RestTimerManager.requestAuthorization()
+                    if !ProcessInfo.processInfo.arguments.contains("-UITestMode") {
+                        RestTimerManager.requestAuthorization()
+                    }
                 }
         }
         .modelContainer(sharedModelContainer)
