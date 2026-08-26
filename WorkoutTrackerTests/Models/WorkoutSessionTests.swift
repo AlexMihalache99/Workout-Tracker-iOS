@@ -77,21 +77,21 @@ final class WorkoutSessionTests: XCTestCase {
         let session = WorkoutSession(workout: workout, context: context)
         session.addExercise(exercise)
 
-        let result = session.save()
+        let result = try session.save()
 
         XCTAssertNotNil(result)
         let allWorkouts = try context.fetch(FetchDescriptor<Workout>())
         XCTAssertEqual(allWorkouts.count, 1)
     }
 
-    func test_save_returnsNilWhenNoExercisesAdded() {
+    func test_save_returnsNilWhenNoExercisesAdded() throws {
         let workout = Workout(date: Date())
         let session = WorkoutSession(workout: workout, context: context)
 
-        XCTAssertNil(session.save())
+        XCTAssertNil(try session.save())
     }
 
-    func test_save_returnsNilWhileInPairingMode() {
+    func test_save_returnsNilWhileInPairingMode() throws {
         let exercise1 = TestFixtures.makeExercise(context: context, name: "Bench Press")
         let exercise2 = TestFixtures.makeExercise(context: context, name: "Barbell Row")
         let workout = Workout(date: Date())
@@ -100,10 +100,10 @@ final class WorkoutSessionTests: XCTestCase {
         session.addExercise(exercise2)
         session.isPairingMode = true
 
-        XCTAssertNil(session.save())
+        XCTAssertNil(try session.save())
     }
 
-    func test_save_returnsCorrectTotalsForHealthKitSync() {
+    func test_save_returnsCorrectTotalsForHealthKitSync() throws {
         let exercise = TestFixtures.makeExercise(context: context, name: "Deadlift")
         let workout = Workout(date: Date())
         let session = WorkoutSession(workout: workout, context: context)
@@ -113,7 +113,7 @@ final class WorkoutSessionTests: XCTestCase {
         session.addSet(SetEntry(setType: .working, setNumber: 1, weight: 100, reps: 5), to: entry)
         session.addSet(SetEntry(setType: .working, setNumber: 2, weight: 100, reps: 5), to: entry)
 
-        let result = session.save()
+        let result = try session.save()
 
         XCTAssertEqual(result?.sets, 2)
         XCTAssertEqual(result?.volumeKg, 1000)

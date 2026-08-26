@@ -38,13 +38,14 @@ struct NewWorkoutView: View {
 private struct NewWorkoutFormView: View {
     @Environment(\.dismiss) private var dismiss
     let workout: Workout
-    @ObservedObject var session: WorkoutSession   // <- the actual fix: reactive subscription lives here
+    @ObservedObject var session: WorkoutSession
 
     @State private var showingExercisePicker = false
     @State private var setEditorTarget: SetEditorTarget?
     @State private var showingDiscardConfirmation = false
     @State private var pendingRestDuration: Int? = nil
     @State private var warmupSuggestionEntry: ExerciseEntry?
+    @State private var saveErrorMessage: String?
 
     @StateObject private var restTimer = RestTimerManager()
     @AppStorage("restTimerDuration") private var restTimerDuration: Int = 90
@@ -125,24 +126,29 @@ private struct NewWorkoutFormView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        guard let result = session.save() else { return }
-                        UINotificationFeedbackGenerator().notificationOccurred(.success)
-                        restTimer.cancel()
+                        do {
+                            guard let result = try session.save() else { return }
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            restTimer.cancel()
 
-                        if healthSyncEnabled {
-                            Task {
-                                do {
-                                    try await HealthKitManager.shared.saveWorkout(
-                                        start: result.start, end: result.end,
-                                        workingSets: result.sets, totalVolumeKg: result.volumeKg
-                                    )
-                                    HealthKitManager.shared.clearSyncError()
-                                } catch {
-                                    HealthKitManager.shared.recordSyncError(error.localizedDescription)
+                            if healthSyncEnabled {
+                                Task {
+                                    do {
+                                        try await HealthKitManager.shared.saveWorkout(
+                                            start: result.start, end: result.end,
+                                            workingSets: result.sets, totalVolumeKg: result.volumeKg
+                                        )
+                                        HealthKitManager.shared.clearSyncError()
+                                    } catch {
+                                        HealthKitManager.shared.recordSyncError(error.localizedDescription)
+                                    }
                                 }
                             }
+                            dismiss()
+                        } catch {
+                            UINotificationFeedbackGenerator().notificationOccurred(.error)
+                            saveErrorMessage = error.localizedDescription
                         }
-                        dismiss()
                     }
                     .disabled(!session.isReadyToSave)
                     .accessibilityIdentifier("newWorkout.saveButton")
@@ -187,6 +193,14 @@ private struct NewWorkoutFormView: View {
                         }
                     )
                 }
+            }
+            .alert("Save Failed", isPresented: Binding(
+                get: { saveErrorMessage != nil },
+                set: { if !$0 { saveErrorMessage = nil } }
+            )) {
+                Button("OK") { saveErrorMessage = nil }
+            } message: {
+                Text(saveErrorMessage ?? "")
             }
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

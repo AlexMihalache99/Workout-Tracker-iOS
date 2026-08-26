@@ -12,6 +12,18 @@ import Combine
 
 @MainActor
 final class WorkoutSession: ObservableObject {
+    
+    enum WorkoutSaveError: LocalizedError {
+        case persistenceFailed(underlying: Error)
+
+        var errorDescription: String? {
+            switch self {
+            case .persistenceFailed(let error):
+                return "Couldn't save this workout: \(error.localizedDescription)"
+            }
+        }
+    }
+    
     let workout: Workout
     private let context: ModelContext
 
@@ -151,12 +163,19 @@ final class WorkoutSession: ObservableObject {
     }
 
     @discardableResult
-    func save() -> (start: Date, end: Date, sets: Int, volumeKg: Double)? {
+    func save() throws -> (start: Date, end: Date, sets: Int, volumeKg: Double)? {
         guard isReadyToSave else { return nil }
         let end = Date()
         workout.sessionEndTime = end
         context.insert(workout)
-        try? context.save()
+
+        do {
+            try context.save()
+        } catch {
+            context.delete(workout)
+            throw WorkoutSaveError.persistenceFailed(underlying: error)
+        }
+
         let start = workout.sessionStartTime ?? workout.date
         return (start, end, workout.totalWorkingSets, workout.totalVolume)
     }
