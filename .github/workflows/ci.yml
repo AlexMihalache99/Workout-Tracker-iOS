@@ -14,23 +14,11 @@ jobs:
     timeout-minutes: 30
 
     steps:
-
-      - name: List installed Xcode versions
-        run: ls /Applications | grep Xcode
-
-      - name: List simulator runtimes for default Xcode
-        run: xcrun simctl list runtimes
-
-      - name: Show xcode-select path
-        run: xcode-select -p
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show installed Xcode versions
-        run: ls /Applications | grep Xcode
-
-      - name: Select Xcode
-        run: sudo xcode-select -switch /Applications/Xcode_16.app/Contents/Developer
+      - name: Show active Xcode
+        run: xcode-select -p
 
       - name: Install xcbeautify
         run: brew install xcbeautify
