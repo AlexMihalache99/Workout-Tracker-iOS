@@ -1,0 +1,45 @@
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Build and Test
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_16.app/Contents/Developer
+
+      - name: Install xcbeautify
+        run: brew install xcbeautify
+
+      - name: Show available simulators
+        run: xcrun simctl list devices available
+
+      - name: Build and test
+        run: |
+          xcodebuild test \
+            -project WorkoutTracker.xcodeproj \
+            -scheme WorkoutTracker \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -skipMacroValidation \
+            | xcbeautify --renderer github-actions
+        env:
+          NSUnbufferedIO: YES
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ~/Library/Developer/Xcode/DerivedData/**/Logs/Test/*.xcresult
