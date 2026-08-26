@@ -26,20 +26,29 @@ jobs:
       - name: Install xcbeautify
         run: brew install xcbeautify
 
-      - name: Show available simulators
-        run: xcrun simctl list devices available
+      - name: Show destinations eligible for this scheme
+        run: |
+          xcodebuild -project WorkoutTracker.xcodeproj \
+            -scheme WorkoutTracker \
+            -showdestinations
 
-      - name: Find an available iPhone simulator
+      - name: Find an eligible iOS Simulator destination
         id: sim
         run: |
-          UDID=$(xcrun simctl list devices available \
-            | grep -E '^\s*iPhone' \
+          xcodebuild -project WorkoutTracker.xcodeproj \
+            -scheme WorkoutTracker \
+            -showdestinations > /tmp/destinations.txt 2>&1
+
+          UDID=$(grep 'platform:iOS Simulator' /tmp/destinations.txt \
+            | grep -o -E 'id:[0-9A-Fa-f-]+' \
             | head -n 1 \
-            | grep -o -E '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}')
+            | cut -d: -f2)
+
           if [ -z "$UDID" ]; then
-            echo "No available iPhone simulator found." >&2
+            echo "No eligible iOS Simulator destination found." >&2
             exit 1
           fi
+
           echo "Found simulator UDID: $UDID"
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
