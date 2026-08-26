@@ -84,8 +84,7 @@ enum ConsistencyCalculator {
         } else {
             weeksActive = weeksBack
         }
-
-        let windowWorkoutCount = workouts.filter { $0.date >= gridStart }.count
+        let windowWorkoutCount = workouts.filter { $0.date >= gridStart && $0.date < currentWeekEnd }.count
         let avgPerWeek = Double(windowWorkoutCount) / Double(weeksActive)
 
         return ConsistencyStats(days: days, currentWeekStreak: currentStreak, longestWeekStreak: longestStreak, avgSessionsPerWeek: avgPerWeek)

@@ -81,8 +81,6 @@ final class ConsistencyCalculatorTests: XCTestCase {
     }
 
     func test_avgSessionsPerWeek_isNotArtificiallyDeflatedForShortHistory() {
-        // Only ~2 weeks of real history -- average should reflect that window,
-        // not be divided by the full fixed 20-week lookback.
         let reference = Date()
         let workouts = [
             makeWorkout(date: daysAgo(1, from: reference), sets: 5),
@@ -91,5 +89,19 @@ final class ConsistencyCalculatorTests: XCTestCase {
 
         let stats = ConsistencyCalculator.build(workouts: workouts, weeksBack: 20, referenceDate: reference)
         XCTAssertGreaterThan(stats.avgSessionsPerWeek, 0.5)
+    }
+    
+    func test_avgSessionsPerWeek_ignoresFutureDatedWorkouts() {
+        let reference = Date()
+        let pastWorkouts = [
+            makeWorkout(date: daysAgo(1, from: reference), sets: 5),
+            makeWorkout(date: daysAgo(8, from: reference), sets: 5),
+        ]
+        let futureWorkout = makeWorkout(date: Calendar.current.date(byAdding: .day, value: 30, to: reference)!, sets: 5)
+
+        let statsWithoutFuture = ConsistencyCalculator.build(workouts: pastWorkouts, weeksBack: 20, referenceDate: reference)
+        let statsWithFuture = ConsistencyCalculator.build(workouts: pastWorkouts + [futureWorkout], weeksBack: 20, referenceDate: reference)
+
+        XCTAssertEqual(statsWithoutFuture.avgSessionsPerWeek, statsWithFuture.avgSessionsPerWeek, accuracy: 0.0001)
     }
 }
