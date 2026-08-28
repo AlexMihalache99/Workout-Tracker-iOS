@@ -196,40 +196,6 @@ struct SettingsView: View {
                 }
                 
                 
-                appleHealthSection
-                
-                Section("Rest Timer") {
-                    Stepper(value: $restTimerDuration, in: 30...300, step: 15) {
-                        HStack {
-                            Text("Default Duration")
-                            Spacer()
-                            Text(formattedDuration(restTimerDuration))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    Text("Starts automatically after logging a working set. Heavy compound lifts often need 3–5 min.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section("Backup") {
-                    Button {
-                        exportBackup()
-                    } label: {
-                        Label("Export Backup", systemImage: "square.and.arrow.up")
-                    }
-
-                    Button {
-                        showingImportPicker = true
-                    } label: {
-                        Label("Import Backup", systemImage: "square.and.arrow.down")
-                    }
-
-                    Text("Export before updating or reinstalling the app, then import afterward to restore your full workout history.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                
                 Section("Plate Calculator") {
                     HStack {
                         Text("Bar Weight")
@@ -263,6 +229,40 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                }
+                
+                Section("Rest Timer") {
+                    Stepper(value: $restTimerDuration, in: 30...300, step: 15) {
+                        HStack {
+                            Text("Default Duration")
+                            Spacer()
+                            Text(formattedDuration(restTimerDuration))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Text("Starts automatically after logging a working set. Heavy compound lifts often need 3–5 min.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                appleHealthSection
+                
+                Section("Backup") {
+                    Button {
+                        exportBackup()
+                    } label: {
+                        Label("Export Backup", systemImage: "square.and.arrow.up")
+                    }
+
+                    Button {
+                        showingImportPicker = true
+                    } label: {
+                        Label("Import Backup", systemImage: "square.and.arrow.down")
+                    }
+
+                    Text("Export before updating or reinstalling the app, then import afterward to restore your full workout history.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
             }
