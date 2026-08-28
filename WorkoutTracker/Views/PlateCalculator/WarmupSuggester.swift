@@ -25,14 +25,26 @@ enum WarmupSuggester {
     static func suggest(targetWeightKg: Double, barWeightKg: Double) -> [SuggestedWarmupSet] {
         guard targetWeightKg > barWeightKg else { return [] }
 
-        return steps.map { step in
+        var results: [SuggestedWarmupSet] = []
+        var lastWeight: Double? = nil
+
+        for step in steps {
             let raw = step.percent == 0 ? barWeightKg : targetWeightKg * step.percent
-            let rounded = roundToNearestPlateIncrement(max(raw, barWeightKg))
-            return SuggestedWarmupSet(weightKg: rounded, reps: step.reps, label: step.label)
+            var rounded = roundToNearestPlateIncrement(max(raw, barWeightKg))
+
+            if let last = lastWeight, rounded <= last {
+                rounded = last + 2.5
+            }
+
+            guard rounded < targetWeightKg else { continue }
+
+            results.append(SuggestedWarmupSet(weightKg: rounded, reps: step.reps, label: step.label))
+            lastWeight = rounded
         }
+
+        return results
     }
 
-    // Smallest standard plate is 1.25kg, so 2.5kg is the smallest real change per side
     private static func roundToNearestPlateIncrement(_ weight: Double) -> Double {
         (weight / 2.5).rounded() * 2.5
     }

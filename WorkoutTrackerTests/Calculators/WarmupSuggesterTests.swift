@@ -52,4 +52,24 @@ final class WarmupSuggesterTests: XCTestCase {
             XCTAssertEqual(remainder, 0, accuracy: 0.0001)
         }
     }
+    
+    func test_suggest_neverProducesDuplicateWeights() {
+        let sets = WarmupSuggester.suggest(targetWeightKg: 40, barWeightKg: 20)
+        let weights = sets.map { $0.weightKg }
+        XCTAssertEqual(weights, Array(Set(weights)).sorted(), "no duplicate weights, and strictly ascending")
+    }
+
+    func test_suggest_isStrictlyMonotonicallyIncreasing() {
+        let sets = WarmupSuggester.suggest(targetWeightKg: 60, barWeightKg: 20)
+        for i in 1..<sets.count {
+            XCTAssertGreaterThan(sets[i].weightKg, sets[i - 1].weightKg)
+        }
+    }
+
+    func test_suggest_neverEqualsOrExceedsTarget() {
+        let sets = WarmupSuggester.suggest(targetWeightKg: 45, barWeightKg: 20)
+        for set in sets {
+            XCTAssertLessThan(set.weightKg, 45)
+        }
+    }
 }
