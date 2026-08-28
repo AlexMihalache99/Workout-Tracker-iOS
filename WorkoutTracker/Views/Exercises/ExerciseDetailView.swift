@@ -8,13 +8,6 @@
 import SwiftUI
 import SwiftData
 
-private enum PRTrackingOption: String, CaseIterable, Identifiable {
-    case none = "Not Tracked"
-    case weight = "Weight"
-    case reps = "Reps"
-    var id: String { rawValue }
-}
-
 struct ExerciseDetailView: View {
     let exercise: Exercise
 
