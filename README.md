@@ -133,23 +133,14 @@ Weights are stored in kilograms internally. The selected display unit only chang
 
 # Known Issues / Remediation Backlog
 
-### P0 — Correctness & data integrity
-- [x] Save failures are swallowed (`try? modelContext.save()`) — success haptic/dismiss fire even if persistence fails
-- [x] Workout volume is wrong for bodyweight exercises (weight=0 → volume=0) and backwards for assisted exercises (assistance × reps instead of effective load × reps)
-- [x] Backup export omits `prMetric` — PR tracking choices (Reps/Assisted) don't survive export/import
-- [x] Backup export omits `supersetGroupID` — superset pairings don't survive export/import
-- [x] Backup import silently skips exercise entries with no catalog match — no count/warning shown to the user
-- [x] Backup merge duplicates workouts on repeat import — no identity-based dedup
-- [x] Deload signal doesn't verify the 3 weeks it compares are actually consecutive calendar weeks
+### P0 — breaks a feature or risks silent data loss
+- [ ] Apple Health sync is fully broken — HealthKitManager.requestAuthorization() never requests write access for activeEnergyType, but hasWorkoutWriteAuthorization requires it. Result: the Health sync toggle will report failure even when the user grants everything asked. (HealthKitManager.swift)
+- [ ] ExercisePickerView.addCustomExercise swallows save errors — try? modelContext.save() discards failures and proceeds as if the new exercise was persisted, then hands it off to be used in a workout entry. Same bug class as the NewWorkoutView save issue already fixed this session, just left unfixed here. (ExercisePickerView.swift)
 
-### P1 — Robustness
-- [x] `SetEntry` has no model-level invariant enforcement (RPE 0.5–10, RIR 0–5, mutually exclusive) — only the UI constrains input
-- [x] Superset groups with >2 entries would silently drop exercises from `NewWorkoutView` (currently unreachable via UI, but the model allows it)
-- [x] Consistency calculator's average-per-week can be inflated by future-dated workouts (no upper bound on the window filter)
-- [x] Deload signal compares only first/last week in the window, not full monotonic trend — a mid-window weight bump can be missed
-- [ ] ~~Exercise identity is matched by name in several places (`ReportGenerator`, filters) rather than stable identifier — fragile if renaming exercises is ever supported~~
+### P1 — real data-loss bug, narrower scope
+- [ ] Repeating a workout drops superset pairing — WorkoutListView.repeatWorkout never copies entry.supersetGroupID onto the new entries, so repeating a workout that had a paired superset silently un-pairs it. (WorkoutListView.swift)
 
-### P2 — Polish / lower priority
-- [ ] Plate calculator assumes unlimited plate inventory
-- [ ] Warm-up ramp rounding can produce duplicate weights across steps for light targets
-- [ ] `displayGroups` and report generation re-scan collections rather than indexing once (non-issue at personal-project data scale, but worth noting)
+### P2 — cleanup / latent risk, no current functional impact
+- [ ] Duplicate, shadowing PRTrackingOption enum — one file-scope declaration (missing .assisted, effectively dead code) and one nested inside ExerciseDetailView (the one actually used). Confusing, not broken. (ExerciseDetailView.swift)
+- [ ] Project-level IPHONEOS_DEPLOYMENT_TARGET still 26.5 — harmless today since every real target overrides it, but it's the exact trap that caused the multi-hour CI simulator debugging earlier — any future target added without an explicit override inherits it. (project.pbxproj)
+- [ ] Duplicated, inconsistently-typo'd rest-timer notification text — "beautiful" vs "beatiful" across scheduleNotification/rescheduleNotification. (RestTimeManager.swift)
