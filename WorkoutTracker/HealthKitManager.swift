@@ -32,7 +32,7 @@ final class HealthKitManager: ObservableObject {
     func requestAuthorization() async throws {
         guard isAvailable else { return }
         let readTypes: Set<HKObjectType> = [bodyMassType]
-        let writeTypes: Set<HKSampleType> = [workoutType]
+        let writeTypes: Set<HKSampleType> = [workoutType, activeEnergyType]
         try await store.requestAuthorization(toShare: writeTypes, read: readTypes)
     }
 
@@ -91,15 +91,6 @@ final class HealthKitManager: ObservableObject {
             store.authorizationStatus(for: workoutType) == .sharingAuthorized
             && store.authorizationStatus(for: activeEnergyType) == .sharingAuthorized
         }
-
-    private func requestWorkoutAuthorizationIfNeeded() async throws {
-        let needsAuthorization = store.authorizationStatus(for: workoutType) == .notDetermined
-        || store.authorizationStatus(for: activeEnergyType) == .notDetermined
-
-        if needsAuthorization {
-            try await requestAuthorization()
-        }
-    }
 
     func recordSyncError(_ message: String) {
         lastSyncErrorMessage = message
