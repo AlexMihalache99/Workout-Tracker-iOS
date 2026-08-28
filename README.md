@@ -138,9 +138,9 @@ Weights are stored in kilograms internally. The selected display unit only chang
 - [x] ExercisePickerView.addCustomExercise swallows save errors — try? modelContext.save() discards failures and proceeds as if the new exercise was persisted, then hands it off to be used in a workout entry. Same bug class as the NewWorkoutView save issue already fixed this session, just left unfixed here. (ExercisePickerView.swift)
 
 ### P1 — real data-loss bug, narrower scope
-- [ ] Repeating a workout drops superset pairing — WorkoutListView.repeatWorkout never copies entry.supersetGroupID onto the new entries, so repeating a workout that had a paired superset silently un-pairs it. (WorkoutListView.swift)
+- [x] Repeating a workout drops superset pairing — WorkoutListView.repeatWorkout never copies entry.supersetGroupID onto the new entries, so repeating a workout that had a paired superset silently un-pairs it. (WorkoutListView.swift)
 
 ### P2 — cleanup / latent risk, no current functional impact
-- [ ] Duplicate, shadowing PRTrackingOption enum — one file-scope declaration (missing .assisted, effectively dead code) and one nested inside ExerciseDetailView (the one actually used). Confusing, not broken. (ExerciseDetailView.swift)
-- [ ] Project-level IPHONEOS_DEPLOYMENT_TARGET still 26.5 — harmless today since every real target overrides it, but it's the exact trap that caused the multi-hour CI simulator debugging earlier — any future target added without an explicit override inherits it. (project.pbxproj)
-- [ ] Duplicated, inconsistently-typo'd rest-timer notification text — "beautiful" vs "beatiful" across scheduleNotification/rescheduleNotification. (RestTimeManager.swift)
+- [x] Duplicate, shadowing PRTrackingOption enum — one file-scope declaration (missing .assisted, effectively dead code) and one nested inside ExerciseDetailView (the one actually used). Confusing, not broken. (ExerciseDetailView.swift)
+- [x] Project-level IPHONEOS_DEPLOYMENT_TARGET still 26.5 — harmless today since every real target overrides it, but it's the exact trap that caused the multi-hour CI simulator debugging earlier — any future target added without an explicit override inherits it. (project.pbxproj)
+- [x] Duplicated, inconsistently-typo'd rest-timer notification text — "beautiful" vs "beatiful" across scheduleNotification/rescheduleNotification. (RestTimeManager.swift)
