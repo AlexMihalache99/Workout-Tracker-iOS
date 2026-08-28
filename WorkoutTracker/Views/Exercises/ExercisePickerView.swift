@@ -15,6 +15,7 @@ struct ExercisePickerView: View {
     var onPick: (Exercise) -> Void
 
     @State private var searchText = ""
+    @State private var saveErrorMessage: String?
 
     private var filteredExercises: [Exercise] {
         if searchText.isEmpty {
@@ -90,14 +91,31 @@ struct ExercisePickerView: View {
                     ContentUnavailableView.search(text: searchText)
                 }
             }
+            .alert(
+                "Couldn't Add Exercise",
+                isPresented: Binding(
+                    get: { saveErrorMessage != nil },
+                    set: { if !$0 { saveErrorMessage = nil } }
+                )
+            ) {
+                Button("OK") { saveErrorMessage = nil }
+            } message: {
+                Text(saveErrorMessage ?? "")
+            }
         }
     }
 
     private func addCustomExercise(name: String) {
-        let newExercise = Exercise(name: name, category: "Custom", isMainLift: false)
-        modelContext.insert(newExercise)
-        try? modelContext.save()
-        onPick(newExercise)
-        dismiss()
-    }
+            let newExercise = Exercise(name: name, category: "Custom", isMainLift: false)
+            modelContext.insert(newExercise)
+            do {
+                try modelContext.save()
+            } catch {
+                modelContext.delete(newExercise)
+                saveErrorMessage = error.localizedDescription
+                return
+            }
+            onPick(newExercise)
+            dismiss()
+        }
 }
