@@ -150,6 +150,6 @@ Weights are stored in kilograms internally. The selected display unit only chang
 - [ ] ~~Exercise identity is matched by name in several places (`ReportGenerator`, filters) rather than stable identifier — fragile if renaming exercises is ever supported~~
 
 ### P2 — Polish / lower priority
-- [ ] Plate calculator assumes unlimited plate inventory
-- [ ] Warm-up ramp rounding can produce duplicate weights across steps for light targets
-- [ ] `displayGroups` and report generation re-scan collections rather than indexing once (non-issue at personal-project data scale, but worth noting)
+- [x] Plate calculator assumes unlimited plate inventory
+- [x] Warm-up ramp rounding can produce duplicate weights across steps for light targets
+- [ ] ~~`displayGroups` and report generation re-scan collections rather than indexing once (non-issue at personal-project data scale, but worth noting)~~
