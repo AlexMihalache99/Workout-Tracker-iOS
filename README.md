@@ -134,8 +134,8 @@ Weights are stored in kilograms internally. The selected display unit only chang
 # Known Issues / Remediation Backlog
 
 ### P0 — breaks a feature or risks silent data loss
-- [ ] Apple Health sync is fully broken — HealthKitManager.requestAuthorization() never requests write access for activeEnergyType, but hasWorkoutWriteAuthorization requires it. Result: the Health sync toggle will report failure even when the user grants everything asked. (HealthKitManager.swift)
-- [ ] ExercisePickerView.addCustomExercise swallows save errors — try? modelContext.save() discards failures and proceeds as if the new exercise was persisted, then hands it off to be used in a workout entry. Same bug class as the NewWorkoutView save issue already fixed this session, just left unfixed here. (ExercisePickerView.swift)
+- [x] Apple Health sync is fully broken — HealthKitManager.requestAuthorization() never requests write access for activeEnergyType, but hasWorkoutWriteAuthorization requires it. Result: the Health sync toggle will report failure even when the user grants everything asked. (HealthKitManager.swift)
+- [x] ExercisePickerView.addCustomExercise swallows save errors — try? modelContext.save() discards failures and proceeds as if the new exercise was persisted, then hands it off to be used in a workout entry. Same bug class as the NewWorkoutView save issue already fixed this session, just left unfixed here. (ExercisePickerView.swift)
 
 ### P1 — real data-loss bug, narrower scope
 - [ ] Repeating a workout drops superset pairing — WorkoutListView.repeatWorkout never copies entry.supersetGroupID onto the new entries, so repeating a workout that had a paired superset silently un-pairs it. (WorkoutListView.swift)
