@@ -12,6 +12,15 @@ struct PlateCalculatorView: View {
     @AppStorage("barWeightKg") private var barWeightKg: Double = 20
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
     private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
+    
+    @AppStorage("plateInventoryEnabled") private var plateInventoryEnabled: Bool = false
+    @AppStorage("plateInventory25") private var plateInventory25: Int = 4
+    @AppStorage("plateInventory20") private var plateInventory20: Int = 4
+    @AppStorage("plateInventory15") private var plateInventory15: Int = 4
+    @AppStorage("plateInventory10") private var plateInventory10: Int = 4
+    @AppStorage("plateInventory5") private var plateInventory5: Int = 4
+    @AppStorage("plateInventory2_5") private var plateInventory2_5: Int = 4
+    @AppStorage("plateInventory1_25") private var plateInventory1_25: Int = 4
 
     @State private var targetText: String
     @FocusState private var fieldFocused: Bool
@@ -23,9 +32,21 @@ struct PlateCalculatorView: View {
     private var targetWeight: Double {
         Double(targetText.replacingOccurrences(of: ",", with: ".")) ?? 0
     }
+    
+    private var inventory: [Double: Int]? {
+        guard plateInventoryEnabled else { return nil }
+        return [
+            25: plateInventory25, 20: plateInventory20, 15: plateInventory15,
+            10: plateInventory10, 5: plateInventory5, 2.5: plateInventory2_5, 1.25: plateInventory1_25
+        ]
+    }
 
     private var breakdown: PlateBreakdown {
-        PlateCalculator.calculate(targetWeight: weightUnit.toKg(targetWeight), barWeight: barWeightKg)
+        PlateCalculator.calculate(
+            targetWeight: weightUnit.toKg(targetWeight),
+            barWeight: weightUnit.toKg(barWeightKg),
+            inventoryPerSide: inventory
+        )
     }
 
     private func plateColor(_ plateKg: Double) -> Color {
@@ -103,6 +124,12 @@ struct PlateCalculatorView: View {
 
                             if !breakdown.isExactMatch {
                                 Text("Closest achievable: \(String(format: "%.2f", weightUnit.fromKg(breakdown.achievedTotal))) \(weightUnit.label)")
+                                    .font(.caption)
+                                    .foregroundStyle(PlateColor.squat)
+                            }
+                            
+                            if breakdown.limitedByInventory {
+                                Text("Limited by your plate inventory — you'd need more plates to reach this weight exactly.")
                                     .font(.caption)
                                     .foregroundStyle(PlateColor.squat)
                             }

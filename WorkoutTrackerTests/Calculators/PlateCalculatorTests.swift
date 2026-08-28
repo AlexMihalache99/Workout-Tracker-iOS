@@ -56,4 +56,29 @@ final class PlateCalculatorTests: XCTestCase {
         let result = PlateCalculator.calculate(targetWeight: 0, barWeight: 20)
         XCTAssertTrue(result.platesPerSide.isEmpty)
     }
+    
+    func test_calculate_respectsInventoryLimit() {
+        let result = PlateCalculator.calculate(
+            targetWeight: 140, barWeight: 20,
+            inventoryPerSide: [25: 1, 20: 4, 15: 4, 10: 4, 5: 4, 2.5: 4, 1.25: 4]
+        )
+        
+        XCTAssertFalse(result.platesPerSide.filter { $0 == 25 }.count > 1)
+        XCTAssertTrue(result.limitedByInventory || result.isExactMatch)
+    }
+
+    func test_calculate_unlimitedInventoryByDefault_matchesPreviousBehavior() {
+        let result = PlateCalculator.calculate(targetWeight: 142.5, barWeight: 20)
+        XCTAssertEqual(result.platesPerSide, [25, 25, 10, 1.25])
+        XCTAssertFalse(result.limitedByInventory)
+    }
+
+    func test_calculate_flagsLimitedByInventoryWhenTargetUnreachable() {
+        let result = PlateCalculator.calculate(
+            targetWeight: 200, barWeight: 20,
+            inventoryPerSide: [25: 1, 20: 1, 15: 0, 10: 0, 5: 0, 2.5: 0, 1.25: 0]
+        )
+        XCTAssertTrue(result.limitedByInventory)
+        XCTAssertFalse(result.isExactMatch)
+    }
 }

@@ -19,6 +19,16 @@ struct SettingsView: View {
     @AppStorage("healthSyncEnabled") private var healthSyncEnabled: Bool = false
     @ObservedObject private var healthManager = HealthKitManager.shared
     
+    
+    @AppStorage("plateInventoryEnabled") private var plateInventoryEnabled: Bool = false
+    @AppStorage("plateInventory25") private var plateInventory25: Int = 4
+    @AppStorage("plateInventory20") private var plateInventory20: Int = 4
+    @AppStorage("plateInventory15") private var plateInventory15: Int = 4
+    @AppStorage("plateInventory10") private var plateInventory10: Int = 4
+    @AppStorage("plateInventory5") private var plateInventory5: Int = 4
+    @AppStorage("plateInventory2_5") private var plateInventory2_5: Int = 4
+    @AppStorage("plateInventory1_25") private var plateInventory1_25: Int = 4
+    
 
     private var weightUnit: Binding<WeightUnit> {
         Binding(
@@ -237,6 +247,22 @@ struct SettingsView: View {
                     Text("Standard Olympic bar is 20 kg (44 lb). Adjust if you train on a different bar.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+                
+                Section("Plate Inventory") {
+                    Toggle("Limit to plates I actually own", isOn: $plateInventoryEnabled)
+                    if plateInventoryEnabled {
+                        Stepper("25 kg: \(plateInventory25) pairs", value: $plateInventory25, in: 0...20)
+                        Stepper("20 kg: \(plateInventory20) pairs", value: $plateInventory20, in: 0...20)
+                        Stepper("15 kg: \(plateInventory15) pairs", value: $plateInventory15, in: 0...20)
+                        Stepper("10 kg: \(plateInventory10) pairs", value: $plateInventory10, in: 0...20)
+                        Stepper("5 kg: \(plateInventory5) pairs", value: $plateInventory5, in: 0...20)
+                        Stepper("2.5 kg: \(plateInventory2_5) pairs", value: $plateInventory2_5, in: 0...20)
+                        Stepper("1.25 kg: \(plateInventory1_25) pairs", value: $plateInventory1_25, in: 0...20)
+                        Text("The calculator will show what's actually achievable with what you own, instead of assuming unlimited plates.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
             }

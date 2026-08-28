@@ -8,27 +8,41 @@
 import Foundation
 
 struct PlateBreakdown {
-    let platesPerSide: [Double]   // largest to smallest, one entry per plate
+    let platesPerSide: [Double]
     let achievedTotal: Double
     let isExactMatch: Bool
+    let limitedByInventory: Bool
 }
 
 enum PlateCalculator {
     static let standardPlates: [Double] = [25, 20, 15, 10, 5, 2.5, 1.25]
 
-    static func calculate(targetWeight: Double, barWeight: Double, availablePlates: [Double] = standardPlates) -> PlateBreakdown {
+    static func calculate(
+        targetWeight: Double,
+        barWeight: Double,
+        availablePlates: [Double] = standardPlates,
+        inventoryPerSide: [Double: Int]? = nil
+    ) -> PlateBreakdown {
         let weightPerSide = (targetWeight - barWeight) / 2
 
         guard weightPerSide > 0 else {
-            return PlateBreakdown(platesPerSide: [], achievedTotal: barWeight, isExactMatch: targetWeight == barWeight)
+            return PlateBreakdown(platesPerSide: [], achievedTotal: barWeight, isExactMatch: targetWeight == barWeight, limitedByInventory: false)
         }
 
         var remaining = weightPerSide
         var plates: [Double] = []
+        var usedCount: [Double: Int] = [:]
+        var limitedByInventory = false
 
         for plate in availablePlates.sorted(by: >) {
-            while remaining >= plate - 0.001 {   // small epsilon for floating point safety
+            let cap = inventoryPerSide?[plate]
+            while remaining >= plate - 0.001 {
+                if let cap, (usedCount[plate] ?? 0) >= cap {
+                    limitedByInventory = true
+                    break
+                }
                 plates.append(plate)
+                usedCount[plate, default: 0] += 1
                 remaining -= plate
             }
         }
@@ -39,7 +53,8 @@ enum PlateCalculator {
         return PlateBreakdown(
             platesPerSide: plates,
             achievedTotal: achievedTotal,
-            isExactMatch: abs(achievedTotal - targetWeight) < 0.01
+            isExactMatch: abs(achievedTotal - targetWeight) < 0.01,
+            limitedByInventory: limitedByInventory
         )
     }
 }
