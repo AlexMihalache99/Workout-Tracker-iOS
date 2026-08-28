@@ -113,7 +113,7 @@ final class RestTimerManager: ObservableObject {
         let remaining = max(1, endDate.timeIntervalSinceNow)
         let content = UNMutableNotificationContent()
         content.title = "Rest complete"
-        content.body = "Let's get to work you beatiful"
+        content.body = "Let's get to work you beautiful"
         content.sound = .default
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: remaining, repeats: false)
         let request = UNNotificationRequest(identifier: notificationID, content: content, trigger: trigger)
