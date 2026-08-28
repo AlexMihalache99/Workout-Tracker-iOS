@@ -147,7 +147,7 @@ Weights are stored in kilograms internally. The selected display unit only chang
 - [x] Superset groups with >2 entries would silently drop exercises from `NewWorkoutView` (currently unreachable via UI, but the model allows it)
 - [x] Consistency calculator's average-per-week can be inflated by future-dated workouts (no upper bound on the window filter)
 - [x] Deload signal compares only first/last week in the window, not full monotonic trend — a mid-window weight bump can be missed
-- [ ] Exercise identity is matched by name in several places (`ReportGenerator`, filters) rather than stable identifier — fragile if renaming exercises is ever supported
+- [ ] ~~Exercise identity is matched by name in several places (`ReportGenerator`, filters) rather than stable identifier — fragile if renaming exercises is ever supported~~
 
 ### P2 — Polish / lower priority
 - [ ] Plate calculator assumes unlimited plate inventory
