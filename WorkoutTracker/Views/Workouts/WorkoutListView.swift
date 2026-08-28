@@ -197,6 +197,7 @@ struct WorkoutListView: View {
             guard let exercise = entry.exercise else { continue }
             let newEntry = ExerciseEntry(exercise: exercise)
             newEntry.lastSessionLabel = lastSessionLabel(for: entry)
+            newEntry.supersetGroupID = entry.supersetGroupID
             newWorkout.exercises.append(newEntry)
         }
         activeWorkout = newWorkout
