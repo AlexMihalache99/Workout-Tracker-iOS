@@ -14,6 +14,17 @@ struct PlateBreakdown {
     let limitedByInventory: Bool
 }
 
+enum PlateCalculatorEligibility {
+    static let eligibleExerciseNames: Set<String> = [
+        "Deadlift", "Bench Press", "Squat", "Overhead Press"
+    ]
+
+    static func isEligible(_ exerciseName: String?) -> Bool {
+        guard let name = exerciseName else { return false }
+        return eligibleExerciseNames.contains(name)
+    }
+}
+
 enum PlateCalculator {
     static let standardPlates: [Double] = [25, 20, 15, 10, 5, 2.5, 1.25]
     

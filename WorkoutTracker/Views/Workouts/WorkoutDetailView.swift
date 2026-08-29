@@ -57,23 +57,7 @@ struct WorkoutDetailView: View {
                         Button {
                             setEditorTarget = SetEditorTarget(entry: entry, set: set)
                         } label: {
-                            HStack {
-                                Text(set.setType == .warmup ? "W" : "\(set.setNumber)")
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 22, height: 22)
-                                    .background(set.setType == .warmup ? PlateColor.warmup : PlateColor.forExercise(entry.exercise?.name ?? ""))
-                                    .clipShape(Circle())
-                                Text("\(weightUnit.fromKg(set.weight), specifier: "%.1f") \(weightUnit.label) × \(set.reps)")
-                                Spacer()
-                                if let rpe = set.rpe {
-                                    Text("RPE \(rpe, specifier: "%.1f")")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                } else if let rir = set.rir {
-                                    Text("RIR \(rir)")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
+                            SetDetailRow(setEntry: set, exerciseName: entry.exercise?.name, weightUnit: weightUnit)
                         }
                         .foregroundStyle(.primary)
                         .accessibilityIdentifier("workoutDetail.setRow.\(set.persistentModelID)")
@@ -123,10 +107,11 @@ struct WorkoutDetailView: View {
                 setType: target.set.setType,
                 nextSetNumber: target.set.setNumber,
                 editingSet: target.set,
+                prMetric: target.entry.exercise?.prMetric,
+                exerciseName: target.entry.exercise?.name,
                 onSave: { _ in
                     try? modelContext.save()
-                },
-                prMetric: target.entry.exercise?.prMetric
+                }
             )
         }
         .scrollContentBackground(.hidden)
@@ -141,5 +126,49 @@ struct WorkoutDetailView: View {
             entry.sets.removeAll { $0.persistentModelID == setToDelete.persistentModelID }
         }
         try? modelContext.save()
+    }
+}
+
+private struct SetDetailRow: View {
+    let setEntry: SetEntry
+    let exerciseName: String?
+    let weightUnit: WeightUnit
+
+    private var badgeLabel: String {
+        setEntry.setType == .warmup ? "W" : "\(setEntry.setNumber)"
+    }
+
+    private var badgeColor: Color {
+        setEntry.setType == .warmup ? PlateColor.warmup : PlateColor.forExercise(exerciseName ?? "")
+    }
+
+    private var weightRepsText: String {
+        let weight = weightUnit.fromKg(setEntry.weight)
+        return String(format: "%.1f", weight) + " \(weightUnit.label) × \(setEntry.reps)"
+    }
+
+    var body: some View {
+        HStack {
+            Text(badgeLabel)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(badgeColor)
+                .clipShape(Circle())
+
+            Text(weightRepsText)
+
+            Spacer()
+
+            if let rpe = setEntry.rpe {
+                Text("RPE \(rpe, specifier: "%.1f")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if let rir = setEntry.rir {
+                Text("RIR \(rir)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }

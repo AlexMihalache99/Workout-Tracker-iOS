@@ -101,4 +101,21 @@ final class PlateCalculatorTests: XCTestCase {
         XCTAssertFalse(result.isExactMatch)
         XCTAssertTrue(result.limitedByInventory)
     }
+    
+    func test_eligibility_trueForMainLiftsAndOverheadPress() {
+        XCTAssertTrue(PlateCalculatorEligibility.isEligible("Deadlift"))
+        XCTAssertTrue(PlateCalculatorEligibility.isEligible("Bench Press"))
+        XCTAssertTrue(PlateCalculatorEligibility.isEligible("Squat"))
+        XCTAssertTrue(PlateCalculatorEligibility.isEligible("Overhead Press"))
+    }
+
+    func test_eligibility_falseForOtherExercises() {
+        XCTAssertFalse(PlateCalculatorEligibility.isEligible("Dumbbell Bench Press"))
+        XCTAssertFalse(PlateCalculatorEligibility.isEligible("Leg Press"))
+        XCTAssertFalse(PlateCalculatorEligibility.isEligible("Assisted Pull-Up"))
+    }
+
+    func test_eligibility_falseForNilExerciseName() {
+        XCTAssertFalse(PlateCalculatorEligibility.isEligible(nil))
+    }
 }

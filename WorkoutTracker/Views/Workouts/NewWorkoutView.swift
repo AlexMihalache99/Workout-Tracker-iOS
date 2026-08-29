@@ -167,14 +167,17 @@ private struct NewWorkoutFormView: View {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }) { target in
                 let nextNumber = target.entry.sets.filter { $0.setType == target.type }.count + 1
-                SetEditorView(setType: target.type, nextSetNumber: nextNumber, prMetric: target.entry.exercise?.prMetric) { newSet in
+                SetEditorView(
+                    setType: target.type,
+                    nextSetNumber: nextNumber,
+                    prMetric: target.entry.exercise?.prMetric,
+                    exerciseName: target.entry.exercise?.name
+                ) { newSet in
                     session.addSet(newSet, to: target.entry)
-                    if target.type == .working {
-                        if session.shouldStartRestTimer(after: target.entry) {
-                            restTimer.start(duration: pendingRestDuration ?? restTimerDuration)
-                        }
-                        pendingRestDuration = nil
+                    if target.type == .working, session.shouldStartRestTimer(after: target.entry) {
+                        restTimer.start(duration: pendingRestDuration ?? restTimerDuration)
                     }
+                    pendingRestDuration = nil
                 }
             }
             .sheet(item: $warmupSuggestionEntry) { entry in
@@ -325,16 +328,18 @@ private struct NewWorkoutFormView: View {
     @ViewBuilder
     private func setActionButtons(for entry: ExerciseEntry) -> some View {
         HStack(spacing: 8) {
-            Button {
-                warmupSuggestionEntry = entry
-            } label: {
-                Image(systemName: "wand.and.stars")
+            
+            if PlateCalculatorEligibility.isEligible(entry.exercise?.name) {
+                Button {
+                    warmupSuggestionEntry = entry
+                } label: {
+                    Image(systemName: "wand.and.stars")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .fixedSize()
+                .accessibilityIdentifier("newWorkout.warmupSuggestButton.\(entry.persistentModelID)")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
-            .fixedSize()
-            .accessibilityIdentifier("newWorkout.warmupSuggestButton.\(entry.persistentModelID)")
-
             Button {
                 setEditorTarget = SetEditorTarget(entry: entry, type: .warmup)
             } label: {

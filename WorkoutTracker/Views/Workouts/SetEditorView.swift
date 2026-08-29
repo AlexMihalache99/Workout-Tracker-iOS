@@ -11,8 +11,9 @@ struct SetEditorView: View {
     let setType: SetType
     let nextSetNumber: Int
     var editingSet: SetEntry? = nil
-    var onSave: (SetEntry) -> Void
     var prMetric: PRMetric? = nil
+    var exerciseName: String? = nil
+    var onSave: (SetEntry) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
@@ -62,16 +63,16 @@ struct SetEditorView: View {
                                 .multilineTextAlignment(.trailing)
                                 .focused($focusedField, equals: .weight)
                                 .accessibilityIdentifier("setEditor.weightField")
-                            if prMetric != .assisted {
-                                Button {
-                                    showingPlateCalculator = true
-                                } label: {
-                                    Image(systemName: "square.stack.3d.up")
-                                        .foregroundStyle(AppTheme.accent)
-                                }
-                                .buttonStyle(.plain)
+                        if PlateCalculatorEligibility.isEligible(exerciseName) {
+                            Button {
+                                showingPlateCalculator = true
+                            } label: {
+                                Image(systemName: "square.stack.3d.up")
+                                    .foregroundStyle(AppTheme.accent)
                             }
+                            .buttonStyle(.plain)
                         }
+                    }
                     HStack {
                         Text("Reps")
                         Spacer()
