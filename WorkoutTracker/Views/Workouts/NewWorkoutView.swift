@@ -50,6 +50,8 @@ private struct NewWorkoutFormView: View {
     @StateObject private var restTimer = RestTimerManager()
     @AppStorage("restTimerDuration") private var restTimerDuration: Int = 90
     @AppStorage("healthSyncEnabled") private var healthSyncEnabled: Bool = false
+    @AppStorage("bodyweightKg") private var bodyweightKg: Double = 0
+
     @FocusState private var nameFieldFocused: Bool
 
     private struct SetEditorTarget: Identifiable {
@@ -136,7 +138,8 @@ private struct NewWorkoutFormView: View {
                                     do {
                                         try await HealthKitManager.shared.saveWorkout(
                                             start: result.start, end: result.end,
-                                            workingSets: result.sets, totalVolumeKg: result.volumeKg
+                                            workingSets: result.sets, totalVolumeKg: result.volumeKg,
+                                            bodyweightKg: bodyweightKg > 0 ? bodyweightKg : nil
                                         )
                                         HealthKitManager.shared.clearSyncError()
                                     } catch {

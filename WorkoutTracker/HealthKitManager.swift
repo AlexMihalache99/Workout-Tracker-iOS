@@ -57,34 +57,36 @@ final class HealthKitManager: ObservableObject {
         }
     }
 
-    func saveWorkout(start: Date, end: Date, workingSets: Int, totalVolumeKg: Double) async throws {
-        guard isAvailable else {
-            throw HealthKitError.notAvailable
-        }
-
+    func saveWorkout(start: Date, end: Date, workingSets: Int, totalVolumeKg: Double, bodyweightKg: Double? = nil) async throws {
+        guard isAvailable else { throw HealthKitError.notAvailable }
         let status = store.authorizationStatus(for: workoutType)
-        guard status == .sharingAuthorized else {
-            throw HealthKitError.notAuthorized
-        }
+        guard status == .sharingAuthorized else { throw HealthKitError.notAuthorized }
 
         let safeEnd = end > start ? end : start.addingTimeInterval(60)
+        let energyBurned = HKQuantity(unit: .kilocalorie(), doubleValue: estimatedCalories(start: start, end: safeEnd, bodyweightKg: bodyweightKg))
 
-        let energyBurned = HKQuantity(unit: .kilocalorie(), doubleValue: estimatedCalories(sets: workingSets))
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = .traditionalStrengthTraining
 
         let builder = HKWorkoutBuilder(healthStore: store, configuration: configuration, device: .local())
         try await builder.beginCollection(at: start)
 
-        let energySample = HKQuantitySample(
-            type: HKQuantityType(.activeEnergyBurned),
-            quantity: energyBurned,
-            start: start,
-            end: safeEnd
-        )
+        let energySample = HKQuantitySample(type: activeEnergyType, quantity: energyBurned, start: start, end: safeEnd)
         try await builder.addSamples([energySample])
         try await builder.endCollection(at: safeEnd)
         _ = try await builder.finishWorkout()
+    }
+
+    /// Standard MET-based estimate: METs x bodyweight(kg) x duration(hours).
+    /// 6.0 METs is a reasonable value for moderate-to-vigorous resistance
+    /// training. Falls back to an average adult bodyweight when the user
+    /// hasn't set one in Settings, since a rough estimate is still better
+    /// than none, but a real bodyweight always takes priority when available.
+    private func estimatedCalories(start: Date, end: Date, bodyweightKg: Double?) -> Double {
+        let durationHours = max(end.timeIntervalSince(start), 60) / 3600
+        let weight = (bodyweightKg ?? 0) > 0 ? bodyweightKg! : 75
+        let metValue = 6.0
+        return metValue * weight * durationHours
     }
 
     var hasWorkoutWriteAuthorization: Bool {
