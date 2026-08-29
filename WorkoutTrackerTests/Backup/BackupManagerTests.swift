@@ -768,4 +768,27 @@ final class BackupManagerTests: XCTestCase {
 
         XCTAssertEqual(names, ["Squat", "Bench Press"], "Missing order field should fall back to the backup's own array order")
     }
+    
+    func test_decode_rejectsMalformedSetTypeString() throws {
+        let json = """
+        {
+            "version": 2,
+            "exportedAt": "2026-01-01T00:00:00Z",
+            "exercises": [],
+            "workouts": [{
+                "date": "2026-01-01T00:00:00Z",
+                "exercises": [{
+                    "exerciseName": "Deadlift",
+                    "sets": [
+                        {"setType": "warm-up", "setNumber": 1, "weight": 60, "reps": 5}
+                    ]
+                }]
+            }]
+        }
+        """.data(using: .utf8)!
+
+        XCTAssertThrowsError(try BackupManager.decode(json)) { error in
+            XCTAssertTrue(error is DecodingError, "A malformed setType should fail decoding explicitly, not silently default to a category")
+        }
+    }
 }
