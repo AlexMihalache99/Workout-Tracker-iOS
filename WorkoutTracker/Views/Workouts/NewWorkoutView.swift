@@ -166,8 +166,11 @@ private struct NewWorkoutFormView: View {
                 let nextNumber = target.entry.sets.filter { $0.setType == target.type }.count + 1
                 SetEditorView(setType: target.type, nextSetNumber: nextNumber, prMetric: target.entry.exercise?.prMetric) { newSet in
                     session.addSet(newSet, to: target.entry)
-                    if target.type == .working, session.shouldStartRestTimer(after: target.entry) {
-                        restTimer.start(duration: pendingRestDuration ?? restTimerDuration)
+                    if target.type == .working {
+                        if session.shouldStartRestTimer(after: target.entry) {
+                            restTimer.start(duration: pendingRestDuration ?? restTimerDuration)
+                        }
+                        pendingRestDuration = nil
                     }
                 }
             }
