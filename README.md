@@ -150,4 +150,4 @@ Weights are stored in kilograms internally. The selected display unit only chang
 - [x] Date.now makes some logic harder to test deterministically; I'd apply the same philosophy more broadly to date-sensitive report/session logic; It will make edge cases such as:end of month, start of week, DST transition, end date, future date.
 - [x] Report language says "RPE" even when effort came from RIR.
 - [x] Some report wording still says "week-1" when it's actually the first session.
-- [ ] Plate Calculator option visible for dumbbells/machine exercises, not applicable, should be present only for the main lifts. (PlateCalculator.swift, WorkoutSessionView.swift)
+- [x] Plate Calculator option visible for dumbbells/machine exercises, not applicable, should be present only for the main lifts. (PlateCalculator.swift, WorkoutSessionView.swift)
