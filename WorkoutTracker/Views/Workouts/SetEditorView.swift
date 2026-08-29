@@ -150,19 +150,17 @@ struct SetEditorView: View {
             rirValue = rir
         }
     }
-
+    
     private func save() {
         guard let weight = weightValue, let reps = repsValue, isValid else { return }
         let weightInKg = weightUnit.toKg(weight)
-        let effectiveTrackingMode = setType == .working ? trackingMode : .none   // warm-ups never carry RPE/RIR
+        let effectiveTrackingMode = setType == .working ? trackingMode : .none
 
         if let existing = editingSet {
-            existing.update(
-                weight: weightInKg,
-                reps: reps,
-                rpe: trackingMode == .rpe ? rpeValue : nil,
-                rir: trackingMode == .rir ? rirValue : nil
-            )
+            existing.weight = weightInKg
+            existing.reps = reps
+            existing.rpe = effectiveTrackingMode == .rpe ? rpeValue : nil
+            existing.rir = effectiveTrackingMode == .rir ? rirValue : nil
             onSave(existing)
         } else {
             let entry = SetEntry(
@@ -179,4 +177,5 @@ struct SetEditorView: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismiss()
     }
+
 }
