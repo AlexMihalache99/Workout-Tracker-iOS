@@ -62,7 +62,7 @@ struct ExerciseDetailView: View {
 
     private var personalRecordEffectiveLoad: Double? {
         guard bodyweightKg > 0, let minAssistance = personalRecordAssistance else { return nil }
-        return bodyweightKg - minAssistance
+        return max(bodyweightKg - minAssistance, 0)
     }
 
     var body: some View {

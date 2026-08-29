@@ -169,7 +169,7 @@ enum ReportGenerator {
                 let sessions: [(date: Date, effectiveLoad: Double)] = entries.compactMap { entry in
                     guard let date = entry.workout?.date,
                           let minAssistance = entry.workingSets.map({ $0.weight }).min() else { return nil }
-                    return (date, bodyweightKg - minAssistance)
+                    return (date, max(bodyweightKg - minAssistance, 0))
                 }.sorted { $0.date < $1.date }
                 guard !sessions.isEmpty else { continue }
 

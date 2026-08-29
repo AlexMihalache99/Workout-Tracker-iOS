@@ -113,4 +113,13 @@ final class PRCalculatorTests: XCTestCase {
 
         XCTAssertEqual(PRCalculator.assistedPR(entries: [entry], bodyweightKg: 80), 70)
     }
+    
+    func test_assistedDataPoints_clampsNegativeEffectiveLoadToZero() {
+        let exercise = TestFixtures.makeExercise(context: context, name: "Assisted Pull-Up", prMetric: .assisted)
+        let workout = TestFixtures.makeWorkout(context: context, date: Date())
+        let entry = TestFixtures.addExerciseEntry(context: context, workout: workout, exercise: exercise, sets: [(.working, 60, 6, nil, nil)])
+
+        let points = PRCalculator.assistedDataPoints(entries: [entry], bodyweightKg: 50)
+        XCTAssertEqual(points.first?.value, 0)
+    }
 }

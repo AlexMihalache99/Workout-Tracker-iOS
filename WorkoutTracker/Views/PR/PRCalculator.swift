@@ -56,7 +56,7 @@ enum PRCalculator {
             .compactMap { entry -> PRDataPoint? in
                 guard let date = entry.workout?.date,
                       let minAssistance = entry.workingSets.map({ $0.weight }).min() else { return nil }
-                return PRDataPoint(date: date, value: bodyweightKg - minAssistance)
+                return PRDataPoint(date: date, value: max(bodyweightKg - minAssistance, 0))
             }
             .sorted { $0.date < $1.date }
     }
