@@ -385,4 +385,20 @@ final class ReportGeneratorTests: XCTestCase {
         let expected = (100.0 * 5) + (80.0 * 10)
         XCTAssertEqual(report.totalVolume, expected)
     }
+    
+    func test_generate_includesWorkoutsLaterOnTheEndDate() {
+        let deadlift = Exercise(name: "Deadlift", category: "Big 3", isMainLift: true, prMetric: .weight)
+        let calendar = Calendar.current
+        let endDateAtMidnight = calendar.startOfDay(for: Date())
+        let workoutLaterThatDay = calendar.date(bySettingHour: 18, minute: 0, second: 0, of: endDateAtMidnight)!
+
+        let workout = makeWorkout(date: workoutLaterThatDay, exercises: [makeEntry(exercise: deadlift, sets: [makeSet(.working, 100, 5)])])
+
+        let report = ReportGenerator.generate(
+            workouts: [workout], allExercises: [deadlift],
+            start: daysAgo(7), end: endDateAtMidnight, phase: .strength, bodyweightKg: 0
+        )
+
+        XCTAssertEqual(report.totalWorkouts, 1)
+    }
 }

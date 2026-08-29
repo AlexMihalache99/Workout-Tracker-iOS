@@ -78,9 +78,10 @@ struct WorkoutReport {
 enum ReportGenerator {
     static func generate(workouts: [Workout], allExercises: [Exercise], start: Date, end: Date, phase: TrainingPhase, bodyweightKg: Double) -> WorkoutReport {
         let calendar = Calendar.current
+        let normalizedEnd = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: end) ?? end
         let inRange = workouts
-            .filter { $0.date >= start && $0.date <= end }
-            .sorted { $0.date < $1.date }
+                .filter { $0.date >= start && $0.date <= normalizedEnd }
+                .sorted { $0.date < $1.date }
 
         let totalSets = inRange.reduce(0) { $0 + $1.totalWorkingSets }
         let totalReps = inRange.reduce(0) { $0 + $1.totalReps }
