@@ -329,4 +329,115 @@ final class WorkoutSessionTests: XCTestCase {
         XCTAssertTrue(groups.allSatisfy { $0.count != 2 || $0.count == 2 })   // no group is treated as a valid pair
         XCTAssertTrue(groups.allSatisfy { $0.count == 1 })                    // all fell back to standalone
     }
+    
+    func test_shouldStartRestTimer_unevenSetCounts_restsOnceShorterExerciseCatchesUp() {
+        let exerciseA = TestFixtures.makeExercise(context: context, name: "Bench Press")
+        let exerciseB = TestFixtures.makeExercise(context: context, name: "Barbell Row")
+        let workout = Workout(date: Date())
+        let session = WorkoutSession(workout: workout, context: context)
+        session.addExercise(exerciseA); session.addExercise(exerciseB)
+        session.togglePairingSelection(workout.exercises[0])
+        session.togglePairingSelection(workout.exercises[1])
+        session.confirmPairing()
+
+        let entryA = workout.exercises[0]
+        let entryB = workout.exercises[1]
+
+        // A does 3 sets, B only ever does 2 -- A's 3rd set should never rest
+        // since B can't catch up to round 3.
+        session.addSet(SetEntry(setType: .working, setNumber: 1, weight: 60, reps: 8), to: entryA)
+        session.addSet(SetEntry(setType: .working, setNumber: 1, weight: 40, reps: 10), to: entryB)
+        session.addSet(SetEntry(setType: .working, setNumber: 2, weight: 60, reps: 8), to: entryA)
+        session.addSet(SetEntry(setType: .working, setNumber: 2, weight: 40, reps: 10), to: entryB)
+        session.addSet(SetEntry(setType: .working, setNumber: 3, weight: 60, reps: 8), to: entryA)
+
+        XCTAssertFalse(session.shouldStartRestTimer(after: entryA))
+    }
+
+    func test_shouldStartRestTimer_afterUnlinkingSuperset_behavesLikeStandaloneExercise() {
+        let exerciseA = TestFixtures.makeExercise(context: context, name: "Bench Press")
+        let exerciseB = TestFixtures.makeExercise(context: context, name: "Barbell Row")
+        let workout = Workout(date: Date())
+        let session = WorkoutSession(workout: workout, context: context)
+        session.addExercise(exerciseA); session.addExercise(exerciseB)
+        session.togglePairingSelection(workout.exercises[0])
+        session.togglePairingSelection(workout.exercises[1])
+        session.confirmPairing()
+
+        session.unlinkSuperset(workout.exercises)
+
+        let entryA = workout.exercises[0]
+        session.addSet(SetEntry(setType: .working, setNumber: 1, weight: 60, reps: 8), to: entryA)
+
+        // No partner anymore -- should always rest, exactly like a standalone exercise.
+        XCTAssertTrue(session.shouldStartRestTimer(after: entryA))
+    }
+
+    func test_shouldStartRestTimer_afterDeletingOneHalfOfPair_behavesLikeStandaloneExercise() {
+        let exerciseA = TestFixtures.makeExercise(context: context, name: "Bench Press")
+        let exerciseB = TestFixtures.makeExercise(context: context, name: "Barbell Row")
+        let workout = Workout(date: Date())
+        let session = WorkoutSession(workout: workout, context: context)
+        session.addExercise(exerciseA); session.addExercise(exerciseB)
+        session.togglePairingSelection(workout.exercises[0])
+        session.togglePairingSelection(workout.exercises[1])
+        session.confirmPairing()
+
+        let entryA = workout.exercises[0]
+        let entryB = workout.exercises[1]
+        session.deleteExerciseEntry(entryB)
+
+        session.addSet(SetEntry(setType: .working, setNumber: 1, weight: 60, reps: 8), to: entryA)
+
+        // Partner is gone -- shouldStartRestTimer's `partners.first` lookup
+        // finds nothing, so it should fall back to "always rest".
+        XCTAssertTrue(session.shouldStartRestTimer(after: entryA))
+    }
+
+    func test_shouldStartRestTimer_afterDeletingSetsMidRound_recalculatesCorrectly() {
+        let exerciseA = TestFixtures.makeExercise(context: context, name: "Bench Press")
+        let exerciseB = TestFixtures.makeExercise(context: context, name: "Barbell Row")
+        let workout = Workout(date: Date())
+        let session = WorkoutSession(workout: workout, context: context)
+        session.addExercise(exerciseA); session.addExercise(exerciseB)
+        session.togglePairingSelection(workout.exercises[0])
+        session.togglePairingSelection(workout.exercises[1])
+        session.confirmPairing()
+
+        let entryA = workout.exercises[0]
+        let entryB = workout.exercises[1]
+
+        session.addSet(SetEntry(setType: .working, setNumber: 1, weight: 60, reps: 8), to: entryA)
+        session.addSet(SetEntry(setType: .working, setNumber: 1, weight: 40, reps: 10), to: entryB)
+        // Round 1 complete -- now delete B's set, dropping it back to 0 sets.
+        session.deleteSets(from: entryB, at: IndexSet(integer: 0))
+
+        // A still has 1 set, B now has 0 -- round is no longer complete.
+        XCTAssertFalse(session.shouldStartRestTimer(after: entryA))
+    }
+
+    func test_shouldStartRestTimer_loggedOutOfSequence_bIsLoggedFirst() {
+        let exerciseA = TestFixtures.makeExercise(context: context, name: "Bench Press")
+        let exerciseB = TestFixtures.makeExercise(context: context, name: "Barbell Row")
+        let workout = Workout(date: Date())
+        let session = WorkoutSession(workout: workout, context: context)
+        session.addExercise(exerciseA); session.addExercise(exerciseB)
+        session.togglePairingSelection(workout.exercises[0])
+        session.togglePairingSelection(workout.exercises[1])
+        session.confirmPairing()
+
+        let entryA = workout.exercises[0]
+        let entryB = workout.exercises[1]
+
+        // Log B first this time (reversed order from the usual A-then-B flow).
+        session.addSet(SetEntry(setType: .working, setNumber: 1, weight: 40, reps: 10), to: entryB)
+        // B is now "ahead" of A (1 set vs 0) -- logging B's own set shouldn't
+        // rest yet, since the round only completes once BOTH have caught up
+        // to the same count, and here B just went first for round 1.
+        XCTAssertFalse(session.shouldStartRestTimer(after: entryB))
+
+        session.addSet(SetEntry(setType: .working, setNumber: 1, weight: 60, reps: 8), to: entryA)
+        // Now A catches up to B's count -- round complete on A's set.
+        XCTAssertTrue(session.shouldStartRestTimer(after: entryA))
+    }
 }
