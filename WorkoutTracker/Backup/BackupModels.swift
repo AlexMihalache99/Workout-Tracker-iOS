@@ -17,7 +17,7 @@ struct BackupExercise: Codable {
 }
 
 struct BackupSet: Codable {
-    var setType: String   // "warmup" or "working"
+    var setType: SetType
     var setNumber: Int
     var weight: Double
     var reps: Int
@@ -101,7 +101,7 @@ enum BackupManager {
 
                 let sets = entry.sets.map { set in
                     BackupSet(
-                        setType: set.setType == .warmup ? "warmup" : "working",
+                        setType: set.setType,
                         setNumber: set.setNumber,
                         weight: set.weight,
                         reps: set.reps,
@@ -248,7 +248,7 @@ enum BackupManager {
                     context.insert(entry)
 
                     for backupSet in backupEntry.sets {
-                        let type: SetType = backupSet.setType == "warmup" ? .warmup : .working
+                        let type: SetType = backupSet.setType
                         let set = SetEntry(
                             setType: type,
                             setNumber: backupSet.setNumber,
