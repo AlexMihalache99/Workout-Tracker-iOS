@@ -26,15 +26,17 @@ final class WorkoutSession: ObservableObject {
     
     let workout: Workout
     private let context: ModelContext
+    private let now: () -> Date
 
     @Published var isPairingMode = false
     @Published var selectedForPairing: Set<PersistentIdentifier> = []
 
-    init(workout: Workout, context: ModelContext) {
+    init(workout: Workout, context: ModelContext, now: @escaping () -> Date = { Date() }) {
         self.workout = workout
         self.context = context
+        self.now = now
         if workout.sessionStartTime == nil {
-            workout.sessionStartTime = Date()
+            workout.sessionStartTime = now()
         }
     }
 
@@ -173,7 +175,7 @@ final class WorkoutSession: ObservableObject {
     @discardableResult
     func save() throws -> (start: Date, end: Date, sets: Int, volumeKg: Double)? {
         guard isReadyToSave else { return nil }
-        let end = Date()
+        let end = now()
         workout.sessionEndTime = end
         context.insert(workout)
 

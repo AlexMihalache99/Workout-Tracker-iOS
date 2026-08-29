@@ -440,4 +440,17 @@ final class WorkoutSessionTests: XCTestCase {
         // Now A catches up to B's count -- round complete on A's set.
         XCTAssertTrue(session.shouldStartRestTimer(after: entryA))
     }
+    
+    func test_save_usesInjectedNowForSessionEndTime() throws {
+        let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let exercise = TestFixtures.makeExercise(context: context, name: "Deadlift")
+        let workout = Workout(date: Date())
+        let session = WorkoutSession(workout: workout, context: context, now: { fixedDate })
+        session.addExercise(exercise)
+
+        let result = try session.save()
+
+        XCTAssertEqual(result?.end, fixedDate)
+        XCTAssertEqual(workout.sessionEndTime, fixedDate)
+    }
 }
