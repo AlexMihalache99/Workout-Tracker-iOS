@@ -134,12 +134,12 @@ Weights are stored in kilograms internally. The selected display unit only chang
 # Known Issues / Remediation Backlog
 
 ### P1 — real correctness/reliability issues
-- [ ] Report date range excludes most workouts on the selected end date; A date-only picker generally gives you midnight at the beginning of the selected day.
-- [ ] Assisted PR/report calculations can produce negative effective load.
-- [ ] Merge idempotency only works when the backup contains workout IDs.
-- [ ] Duplicate exercise names inside a backup can collapse into one exercise.
-- [ ] ExerciseDetail changes rely on implicit persistence.
-- [ ] WorkoutDetail edits rely on autosave.
+- [x] Report date range excludes most workouts on the selected end date; A date-only picker generally gives you midnight at the beginning of the selected day.
+- [x] Assisted PR/report calculations can produce negative effective load.
+- [x] Merge idempotency only works when the backup contains workout IDs.
+- [x] Duplicate exercise names inside a backup can collapse into one exercise.
+- [x] ExerciseDetail changes rely on implicit persistence.
+- [x] WorkoutDetail edits rely on autosave.
 
 ### P2 — cleanup / latent risk, no current functional impact
 - [ ] HealthKitManager contains dead calorie-estimation code.
