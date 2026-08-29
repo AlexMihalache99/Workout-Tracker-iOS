@@ -54,6 +54,14 @@ final class SetEntry {
             rir = currentRIR.clamped(to: SetEntry.validRIRRange)
         }
     }
+    
+    func update(weight: Double, reps: Int, rpe: Double?, rir: Int?) {
+        self.weight = weight
+        self.reps = reps
+        self.rpe = rpe
+        self.rir = rir
+        normalize()
+    }
 }
 
 private extension Comparable {

@@ -106,4 +106,34 @@ final class SetEntryTests: XCTestCase {
         XCTAssertEqual(set.weight, 0)
         XCTAssertEqual(set.rpe, 10)
     }
+    
+    func test_update_clampsOutOfRangeValuesLikeInitDoes() {
+        let set = SetEntry(setType: .working, setNumber: 1, weight: 100, reps: 5)
+
+        set.update(weight: -20, reps: -3, rpe: 14, rir: nil)
+
+        XCTAssertEqual(set.weight, 0)
+        XCTAssertEqual(set.reps, 0)
+        XCTAssertEqual(set.rpe, 10)
+    }
+
+    func test_update_switchingFromRPEtoRIR_clearsThePreviousMetric() {
+        let set = SetEntry(setType: .working, setNumber: 1, weight: 100, reps: 5, rpe: 8)
+        XCTAssertNotNil(set.rpe)
+
+        set.update(weight: 100, reps: 5, rpe: nil, rir: 20)
+
+        XCTAssertNil(set.rpe, "Switching tracking mode should clear the metric no longer in use")
+        XCTAssertEqual(set.rir, 5, "RIR should still be clamped to its valid range")
+    }
+
+    func test_update_validValuesPassThroughUnchanged() {
+        let set = SetEntry(setType: .working, setNumber: 1, weight: 40, reps: 8)
+
+        set.update(weight: 62.5, reps: 6, rpe: 7.5, rir: nil)
+
+        XCTAssertEqual(set.weight, 62.5)
+        XCTAssertEqual(set.reps, 6)
+        XCTAssertEqual(set.rpe, 7.5)
+    }
 }

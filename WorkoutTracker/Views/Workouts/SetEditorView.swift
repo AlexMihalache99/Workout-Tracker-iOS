@@ -157,10 +157,12 @@ struct SetEditorView: View {
         let effectiveTrackingMode = setType == .working ? trackingMode : .none   // warm-ups never carry RPE/RIR
 
         if let existing = editingSet {
-            existing.weight = weightInKg
-            existing.reps = reps
-            existing.rpe = effectiveTrackingMode == .rpe ? rpeValue : nil
-            existing.rir = effectiveTrackingMode == .rir ? rirValue : nil
+            existing.update(
+                weight: weightInKg,
+                reps: reps,
+                rpe: trackingMode == .rpe ? rpeValue : nil,
+                rir: trackingMode == .rir ? rirValue : nil
+            )
             onSave(existing)
         } else {
             let entry = SetEntry(
