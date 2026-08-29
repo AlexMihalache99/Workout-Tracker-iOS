@@ -329,9 +329,60 @@ final class ReportGeneratorTests: XCTestCase {
             start: daysAgo(21), end: daysAgo(0), phase: .strength, bodyweightKg: 0
         )
 
-        // Old implementation (first vs. last only: 100 <= 100) would have
-        // incorrectly fired here despite the real bump in week 2.
         let lift = report.liftProgress.first { $0.exerciseName == "Deadlift" }
         XCTAssertFalse(lift?.deloadSignal ?? true)
+    }
+    
+    func test_totalVolume_usesBodyweightAwareCalculation() {
+        let chinUp = Exercise(name: "Chin-Up", category: "Accessory", isMainLift: false, prMetric: .reps)
+        let workout = makeWorkout(date: daysAgo(1), exercises: [
+            makeEntry(exercise: chinUp, sets: [makeSet(.working, 0, 10)])
+        ])
+
+        let reportWithoutBodyweight = ReportGenerator.generate(
+            workouts: [workout], allExercises: [chinUp],
+            start: daysAgo(7), end: daysAgo(0), phase: .strength, bodyweightKg: 0
+        )
+        let reportWithBodyweight = ReportGenerator.generate(
+            workouts: [workout], allExercises: [chinUp],
+            start: daysAgo(7), end: daysAgo(0), phase: .strength, bodyweightKg: 80
+        )
+
+        // Without bodyweight set, falls back to raw (0) volume for a bodyweight set.
+        XCTAssertEqual(reportWithoutBodyweight.totalVolume, 0)
+        // With bodyweight set, reflects actual training load.
+        XCTAssertEqual(reportWithBodyweight.totalVolume, 800)
+    }
+
+    func test_weeklyStats_volumeIsBodyweightAware() {
+        let assistedPullUp = Exercise(name: "Assisted Pull-Up", category: "Accessory", isMainLift: false, prMetric: .assisted)
+        let lowAssistance = makeWorkout(date: daysAgo(1), exercises: [
+            makeEntry(exercise: assistedPullUp, sets: [makeSet(.working, 10, 8)])
+        ])
+
+        let report = ReportGenerator.generate(
+            workouts: [lowAssistance], allExercises: [assistedPullUp],
+            start: daysAgo(7), end: daysAgo(0), phase: .bodybuilding, bodyweightKg: 80
+        )
+
+        // (80 - 10) * 8 = 560, not the raw 10 * 8 = 80 the old code would have reported
+        XCTAssertEqual(report.weeklyStats.first?.totalVolume, 560)
+    }
+
+    func test_totalVolume_mixedExercises_sumsCorrectlyAcrossMetrics() {
+        let deadlift = Exercise(name: "Deadlift", category: "Big 3", isMainLift: true, prMetric: .weight)
+        let chinUp = Exercise(name: "Chin-Up", category: "Accessory", isMainLift: false, prMetric: .reps)
+        let workout = makeWorkout(date: daysAgo(1), exercises: [
+            makeEntry(exercise: deadlift, sets: [makeSet(.working, 100, 5)]),
+            makeEntry(exercise: chinUp, sets: [makeSet(.working, 0, 10)])
+        ])
+
+        let report = ReportGenerator.generate(
+            workouts: [workout], allExercises: [deadlift, chinUp],
+            start: daysAgo(7), end: daysAgo(0), phase: .strength, bodyweightKg: 80
+        )
+
+        let expected = (100.0 * 5) + (80.0 * 10)
+        XCTAssertEqual(report.totalVolume, expected)
     }
 }

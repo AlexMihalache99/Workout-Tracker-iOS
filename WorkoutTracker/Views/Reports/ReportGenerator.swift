@@ -84,7 +84,7 @@ enum ReportGenerator {
 
         let totalSets = inRange.reduce(0) { $0 + $1.totalWorkingSets }
         let totalReps = inRange.reduce(0) { $0 + $1.totalReps }
-        let totalVolume = inRange.reduce(0.0) { $0 + $1.totalVolume }
+        let totalVolume = inRange.reduce(0.0) { $0 + $1.totalTrainingVolume(bodyweightKg: bodyweightKg) }
 
         var weekBuckets: [Date: [Workout]] = [:]
         for workout in inRange {
@@ -93,7 +93,7 @@ enum ReportGenerator {
         }
 
         let weeklyStats: [WeeklyStat] = weekBuckets.map { weekStart, workoutsInWeek in
-            let volume = workoutsInWeek.reduce(0.0) { $0 + $1.totalVolume }
+            let volume = workoutsInWeek.reduce(0.0) { $0 + $1.totalTrainingVolume(bodyweightKg: bodyweightKg) }
             let efforts = workoutsInWeek
                 .flatMap { $0.exercises }
                 .flatMap { $0.workingSets }
