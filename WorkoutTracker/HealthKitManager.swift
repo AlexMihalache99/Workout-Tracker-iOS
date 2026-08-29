@@ -59,6 +59,7 @@ final class HealthKitManager: ObservableObject {
 
     func saveWorkout(start: Date, end: Date, workingSets: Int, totalVolumeKg: Double, bodyweightKg: Double? = nil) async throws {
         guard isAvailable else { throw HealthKitError.notAvailable }
+        guard hasWorkoutWriteAuthorization else { throw HealthKitError.notAuthorized }
         let status = store.authorizationStatus(for: workoutType)
         guard status == .sharingAuthorized else { throw HealthKitError.notAuthorized }
 
@@ -88,11 +89,18 @@ final class HealthKitManager: ObservableObject {
         let metValue = 6.0
         return metValue * weight * durationHours
     }
-
+    
+    /// True only when BOTH permissions this app writes are granted:
+    /// the workout itself, and the active-energy sample attached to it.
+    /// HealthKit authorizes each HKSampleType independently, so a workout
+    /// can be "authorized" while the energy sample write still silently
+    /// fails if that second type was never granted -- this property exists
+    /// specifically to catch that partial-authorization state before
+    /// attempting a write, rather than after.
     var hasWorkoutWriteAuthorization: Bool {
-            store.authorizationStatus(for: workoutType) == .sharingAuthorized
+        store.authorizationStatus(for: workoutType) == .sharingAuthorized
             && store.authorizationStatus(for: activeEnergyType) == .sharingAuthorized
-        }
+    }
 
     func recordSyncError(_ message: String) {
         lastSyncErrorMessage = message
