@@ -71,7 +71,7 @@ private struct NewWorkoutFormView: View {
                     DatePicker("Date", selection: Binding(
                         get: { workout.date },
                         set: { workout.date = $0 }
-                    ), displayedComponents: [.date, .hourAndMinute])
+                    ), in: ...Date.now, displayedComponents: [.date, .hourAndMinute])
                 }
 
                 ForEach(Array(session.displayGroups.enumerated()), id: \.offset) { _, group in

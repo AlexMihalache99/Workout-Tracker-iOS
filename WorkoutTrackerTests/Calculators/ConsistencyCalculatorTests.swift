@@ -104,4 +104,18 @@ final class ConsistencyCalculatorTests: XCTestCase {
 
         XCTAssertEqual(statsWithoutFuture.avgSessionsPerWeek, statsWithFuture.avgSessionsPerWeek, accuracy: 0.0001)
     }
+    
+    func test_longestStreak_ignoresFutureDatedWorkouts() {
+        let reference = Date()
+        let realStreak = [
+            makeWorkout(date: daysAgo(1, from: reference), sets: 5),
+            makeWorkout(date: daysAgo(8, from: reference), sets: 5),
+        ]
+        let futureWorkout = makeWorkout(date: Calendar.current.date(byAdding: .weekOfYear, value: 1, to: reference)!, sets: 5)
+
+        let withoutFuture = ConsistencyCalculator.build(workouts: realStreak, weeksBack: 20, referenceDate: reference)
+        let withFuture = ConsistencyCalculator.build(workouts: realStreak + [futureWorkout], weeksBack: 20, referenceDate: reference)
+
+        XCTAssertEqual(withoutFuture.longestWeekStreak, withFuture.longestWeekStreak)
+    }
 }

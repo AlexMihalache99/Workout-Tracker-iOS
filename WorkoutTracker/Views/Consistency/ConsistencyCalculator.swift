@@ -52,8 +52,11 @@ enum ConsistencyCalculator {
             cursor = calendar.date(byAdding: .day, value: 1, to: cursor) ?? cursor.addingTimeInterval(86400)
         }
 
-        // Streaks computed from full workout history, not just the displayed window
-        let weeksWithActivity = Set(workouts.map { calendar.dateInterval(of: .weekOfYear, for: $0.date)?.start ?? $0.date })
+        let weeksWithActivity = Set(
+            workouts
+                .filter { $0.date < currentWeekEnd }
+                .map { calendar.dateInterval(of: .weekOfYear, for: $0.date)?.start ?? $0.date }
+        )
 
         var currentStreak = 0
         var weekCursor = currentWeekStart
