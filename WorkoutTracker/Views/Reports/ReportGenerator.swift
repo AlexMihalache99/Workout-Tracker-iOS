@@ -278,9 +278,9 @@ enum ReportGenerator {
                 if phase == .strength {
                     if let delta = lift.weightDelta {
                         if delta > 0 {
-                            insights.append("\(lift.exerciseName) went from your week-1 top set up to a period-best \(String(format: "%.1f", lift.bestWeight ?? 0)) kg — a \(String(format: "%.1f", delta)) kg improvement.")
+                            insights.append("\(lift.exerciseName) went from your starting-period top set up to a period-best \(String(format: "%.1f", lift.bestWeight ?? 0)) kg — a \(String(format: "%.1f", delta)) kg improvement.")
                         } else if delta < 0 {
-                            insights.append("\(lift.exerciseName) period-best top set (\(String(format: "%.1f", lift.bestWeight ?? 0)) kg) came in \(String(format: "%.1f", abs(delta))) kg below your week-1 top set — worth a look.")
+                            insights.append("\(lift.exerciseName) period-best top set (\(String(format: "%.1f", lift.bestWeight ?? 0)) kg) came in \(String(format: "%.1f", abs(delta))) kg below your starting-period top set — worth a look.")
                         } else {
                             insights.append("\(lift.exerciseName) top set held steady across the period.")
                         }
@@ -305,7 +305,7 @@ enum ReportGenerator {
                     if delta > 0 {
                         insights.append("\(lift.exerciseName) bodyweight reps went from \(lift.earliestReps ?? 0) to a period-best \(lift.bestReps ?? 0) — up \(delta) reps.")
                     } else if delta < 0 {
-                        insights.append("\(lift.exerciseName) period-best bodyweight reps (\(lift.bestReps ?? 0)) came in below your week-1 count (\(lift.earliestReps ?? 0)).")
+                        insights.append("\(lift.exerciseName) period-best bodyweight reps (\(lift.bestReps ?? 0)) came in below your starting period count (\(lift.earliestReps ?? 0)).")
                     } else {
                         insights.append("\(lift.exerciseName) bodyweight reps held steady at \(lift.bestReps ?? 0).")
                     }
@@ -319,7 +319,7 @@ enum ReportGenerator {
                     if delta > 0 {
                         insights.append("\(lift.exerciseName) effective load went from \(String(format: "%.1f", lift.earliestEffectiveLoad ?? 0)) kg to a period-best \(String(format: "%.1f", lift.bestEffectiveLoad ?? 0)) kg as assistance decreased.")
                     } else if delta < 0 {
-                        insights.append("\(lift.exerciseName) effective load dipped this period — you're using more assistance than in week 1.")
+                        insights.append("\(lift.exerciseName) effective load dipped this period — you're using more assistance than at the start period.")
                     } else {
                         insights.append("\(lift.exerciseName) effective load held steady.")
                     }
