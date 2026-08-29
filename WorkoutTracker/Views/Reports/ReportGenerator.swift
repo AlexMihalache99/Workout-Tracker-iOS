@@ -344,8 +344,8 @@ enum ReportGenerator {
         if let lowest = lowestEffortWeek, let highest = highestEffortWeek, lowest.weekStart != highest.weekStart {
             let formatter = DateFormatter()
             formatter.dateFormat = "MMM d"
-            insights.append("Week of \(formatter.string(from: lowest.weekStart)) had your lowest average RPE — sets felt easiest that week.")
-            insights.append("Week of \(formatter.string(from: highest.weekStart)) had your highest average RPE — sets felt hardest that week.")
+            insights.append("Week of \(formatter.string(from: lowest.weekStart)) had your lowest average effort — sets felt easiest that week.")
+            insights.append("Week of \(formatter.string(from: highest.weekStart)) had your highest average effort — sets felt hardest that week.")
         }
 
         return insights

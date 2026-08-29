@@ -154,7 +154,7 @@ private struct ReportResultsView: View {
                             Text("\(Int(weightUnit.fromKg(week.totalVolume))) \(weightUnit.label)")
                                 .font(.system(size: 12)).foregroundStyle(AppTheme.textSecondary)
                             if let effort = week.avgEffort {
-                                Text("RPE \(String(format: "%.1f", effort))")
+                                Text("Effort \(String(format: "%.1f", effort))")   // was "RPE \(...)"
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(effortColor(effort))
                             }
