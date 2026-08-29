@@ -88,22 +88,23 @@ struct SetEditorView: View {
                     }
                 }
 
-                Section("Effort Tracking") {
-                    Picker("Mode", selection: $trackingMode) {
-                        ForEach(TrackingMode.allCases, id: \.self) { mode in
-                            Text(mode.rawValue).tag(mode)
+                if setType == .working {
+                    Section("Effort Tracking") {
+                        Picker("Mode", selection: $trackingMode) {
+                            ForEach(TrackingMode.allCases, id: \.self) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
                         }
-                    }
-                    .pickerStyle(.segmented)
-                    .accessibilityIdentifier("setEditor.trackingModePicker")
+                        .pickerStyle(.segmented)
 
-                    if trackingMode == .rpe {
-                        Stepper(value: $rpeValue, in: 5...10, step: 0.5) {
-                            Text("RPE: \(rpeValue, specifier: "%.1f")")
-                        }
-                    } else if trackingMode == .rir {
-                        Stepper(value: $rirValue, in: 0...5) {
-                            Text("RIR: \(rirValue)")
+                        if trackingMode == .rpe {
+                            Stepper(value: $rpeValue, in: 5...10, step: 0.5) {
+                                Text("RPE: \(rpeValue, specifier: "%.1f")")
+                            }
+                        } else if trackingMode == .rir {
+                            Stepper(value: $rirValue, in: 0...5) {
+                                Text("RIR: \(rirValue)")
+                            }
                         }
                     }
                 }
@@ -153,12 +154,13 @@ struct SetEditorView: View {
     private func save() {
         guard let weight = weightValue, let reps = repsValue, isValid else { return }
         let weightInKg = weightUnit.toKg(weight)
+        let effectiveTrackingMode = setType == .working ? trackingMode : .none   // warm-ups never carry RPE/RIR
 
         if let existing = editingSet {
             existing.weight = weightInKg
             existing.reps = reps
-            existing.rpe = trackingMode == .rpe ? rpeValue : nil
-            existing.rir = trackingMode == .rir ? rirValue : nil
+            existing.rpe = effectiveTrackingMode == .rpe ? rpeValue : nil
+            existing.rir = effectiveTrackingMode == .rir ? rirValue : nil
             onSave(existing)
         } else {
             let entry = SetEntry(
@@ -166,13 +168,13 @@ struct SetEditorView: View {
                 setNumber: nextSetNumber,
                 weight: weightInKg,
                 reps: reps,
-                rpe: trackingMode == .rpe ? rpeValue : nil,
-                rir: trackingMode == .rir ? rirValue : nil
+                rpe: effectiveTrackingMode == .rpe ? rpeValue : nil,
+                rir: effectiveTrackingMode == .rir ? rirValue : nil
             )
             onSave(entry)
         }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         focusedField = nil
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismiss()
     }
 }
