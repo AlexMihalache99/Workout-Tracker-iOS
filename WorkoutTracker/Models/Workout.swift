@@ -48,4 +48,8 @@ final class Workout {
         let minutes = Int(end.timeIntervalSince(start) / 60)
         return max(minutes, 0)
     }
+    
+    var sortedExercises: [ExerciseEntry] {
+        exercises.sorted { $0.order < $1.order }
+    }
 }

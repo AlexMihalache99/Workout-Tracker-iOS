@@ -45,13 +45,13 @@ final class WorkoutSession: ObservableObject {
         var seen: Set<PersistentIdentifier> = []
 
         var groupedByID: [UUID: [ExerciseEntry]] = [:]
-        for entry in workout.exercises {
+        for entry in workout.sortedExercises {
             if let groupID = entry.supersetGroupID {
                 groupedByID[groupID, default: []].append(entry)
             }
         }
 
-        for entry in workout.exercises {
+        for entry in workout.sortedExercises {
             if seen.contains(entry.persistentModelID) { continue }
 
             if let groupID = entry.supersetGroupID, let group = groupedByID[groupID], group.count == 2 {
@@ -78,6 +78,7 @@ final class WorkoutSession: ObservableObject {
     func addExercise(_ exercise: Exercise) {
         let entry = ExerciseEntry(exercise: exercise)
         entry.workout = workout
+        entry.order = workout.exercises.count
         workout.exercises.append(entry)
     }
 

@@ -706,4 +706,66 @@ final class BackupManagerTests: XCTestCase {
         XCTAssertEqual(allWorkouts.count, 1)
         XCTAssertEqual(allWorkouts.first?.name, "Legacy Session")
     }
+    
+    func test_roundTrip_preservesExerciseOrderWithinAWorkout() throws {
+        let container = TestModelContainer.make()
+        let context = ModelContext(container)
+
+        let squat = TestFixtures.makeExercise(context: context, name: "Squat")
+        let bench = TestFixtures.makeExercise(context: context, name: "Bench Press")
+        let row = TestFixtures.makeExercise(context: context, name: "Row")
+        let workout = TestFixtures.makeWorkout(context: context, date: .now)
+
+        let entryB = TestFixtures.addExerciseEntry(context: context, workout: workout, exercise: bench, sets: [])
+        let entryS = TestFixtures.addExerciseEntry(context: context, workout: workout, exercise: squat, sets: [])
+        let entryR = TestFixtures.addExerciseEntry(context: context, workout: workout, exercise: row, sets: [])
+        entryB.order = 0
+        entryS.order = 1
+        entryR.order = 2
+        try context.save()
+
+        let backup = try BackupManager.buildBackup(context: context)
+        let data = try BackupManager.encode(backup)
+        let decoded = try BackupManager.decode(data)
+
+        let freshContainer = TestModelContainer.make()
+        let freshContext = ModelContext(freshContainer)
+        try BackupManager.importBackup(decoded, context: freshContext, mode: .replace)
+
+        let importedWorkout = try freshContext.fetch(FetchDescriptor<Workout>()).first!
+        let names = importedWorkout.sortedExercises.compactMap { $0.exercise?.name }
+
+        XCTAssertEqual(names, ["Bench Press", "Squat", "Row"], "Exercise order must survive an export/import round-trip")
+    }
+
+    func test_import_oldBackupWithoutOrderField_fallsBackToArrayPosition() throws {
+        // Simulate a v2 backup captured before the `order` field existed.
+        let json = """
+        {
+            "version": 2,
+            "exportedAt": "2026-01-01T00:00:00Z",
+            "exercises": [
+                {"name": "Squat", "category": "Legs", "isMainLift": true},
+                {"name": "Bench Press", "category": "Push", "isMainLift": true}
+            ],
+            "workouts": [{
+                "date": "2026-01-01T00:00:00Z",
+                "exercises": [
+                    {"exerciseName": "Squat", "sets": []},
+                    {"exerciseName": "Bench Press", "sets": []}
+                ]
+            }]
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try BackupManager.decode(json)
+        let container = TestModelContainer.make()
+        let context = ModelContext(container)
+        try BackupManager.importBackup(decoded, context: context, mode: .replace)
+
+        let workout = try context.fetch(FetchDescriptor<Workout>()).first!
+        let names = workout.sortedExercises.compactMap { $0.exercise?.name }
+
+        XCTAssertEqual(names, ["Squat", "Bench Press"], "Missing order field should fall back to the backup's own array order")
+    }
 }

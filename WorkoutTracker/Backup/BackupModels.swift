@@ -29,6 +29,7 @@ struct BackupExerciseEntry: Codable {
     var exerciseName: String
     var sets: [BackupSet]
     var supersetGroupID: UUID?
+    var order: Int?
 }
 
 struct BackupWorkout: Codable {
@@ -97,7 +98,7 @@ enum BackupManager {
 
         let backupWorkouts = workouts.map { workout in
 
-            let entries = workout.exercises.map { entry in
+            let entries = workout.sortedExercises.enumerated().map { index, entry in
 
                 let sets = entry.sets.map { set in
                     BackupSet(
@@ -113,7 +114,8 @@ enum BackupManager {
                 return BackupExerciseEntry(
                     exerciseName: entry.exercise?.name ?? "Unknown",
                     sets: sets,
-                    supersetGroupID: entry.supersetGroupID
+                    supersetGroupID: entry.supersetGroupID,
+                    order: index
                 )
             }
 
@@ -243,7 +245,7 @@ enum BackupManager {
                 workout.sessionEndTime = backupWorkout.sessionEndTime
                 context.insert(workout)
 
-                for backupEntry in backupWorkout.exercises {
+                for (index, backupEntry) in backupWorkout.exercises.enumerated() {
                     let exercise: Exercise
                     if let existingExercise = exerciseByName[backupEntry.exerciseName] {
                         exercise = existingExercise
@@ -261,6 +263,8 @@ enum BackupManager {
                     let entry = ExerciseEntry(exercise: exercise)
                     entry.workout = workout
                     entry.supersetGroupID = backupEntry.supersetGroupID
+                    entry.order = backupEntry.order ?? index
+                    
                     context.insert(entry)
 
                     for backupSet in backupEntry.sets {

@@ -190,14 +190,15 @@ struct WorkoutListView: View {
         let names = workout.exercises.compactMap { $0.exercise?.name }
         return names.filter { ["Deadlift", "Bench Press", "Squat"].contains($0) }
     }
-
+    
     private func repeatWorkout(_ source: Workout) {
         let newWorkout = Workout(date: .now, name: source.name)
-        for entry in source.exercises {
+        for entry in source.sortedExercises {
             guard let exercise = entry.exercise else { continue }
             let newEntry = ExerciseEntry(exercise: exercise)
             newEntry.lastSessionLabel = lastSessionLabel(for: entry)
             newEntry.supersetGroupID = entry.supersetGroupID
+            newEntry.order = newWorkout.exercises.count          
             newWorkout.exercises.append(newEntry)
         }
         activeWorkout = newWorkout

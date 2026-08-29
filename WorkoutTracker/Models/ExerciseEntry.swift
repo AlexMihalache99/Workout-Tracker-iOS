@@ -13,6 +13,7 @@ final class ExerciseEntry {
     var exercise: Exercise?
     var workout: Workout?
     var supersetGroupID: UUID?
+    var order: Int = 0 
 
     @Relationship(deleteRule: .cascade)
     var sets: [SetEntry] = []

@@ -50,7 +50,7 @@ struct WorkoutDetailView: View {
                 ), axis: .vertical)
             }
 
-            ForEach(workout.exercises) { entry in
+            ForEach(workout.sortedExercises) { entry in
                 Section {
                     ForEach(entry.sortedSets) { set in
                         Button {
