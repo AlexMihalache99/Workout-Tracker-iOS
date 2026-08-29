@@ -103,10 +103,6 @@ final class HealthKitManager: ObservableObject {
         lastSyncErrorMessage = nil
         UserDefaults.standard.removeObject(forKey: lastSyncErrorKey)
     }
-
-    private func estimatedCalories(sets: Int) -> Double {
-        Double(sets) * 6.0
-    }
 }
 
 enum HealthKitError: LocalizedError {
