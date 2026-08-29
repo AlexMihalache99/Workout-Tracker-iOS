@@ -16,7 +16,7 @@ struct PlateBreakdown {
 
 enum PlateCalculator {
     static let standardPlates: [Double] = [25, 20, 15, 10, 5, 2.5, 1.25]
-
+    
     static func calculate(
         targetWeight: Double,
         barWeight: Double,
@@ -32,13 +32,13 @@ enum PlateCalculator {
         var remaining = weightPerSide
         var plates: [Double] = []
         var usedCount: [Double: Int] = [:]
-        var limitedByInventory = false
+        var hitInventoryCap = false
 
         for plate in availablePlates.sorted(by: >) {
             let cap = inventoryPerSide?[plate]
             while remaining >= plate - 0.001 {
                 if let cap, (usedCount[plate] ?? 0) >= cap {
-                    limitedByInventory = true
+                    hitInventoryCap = true
                     break
                 }
                 plates.append(plate)
@@ -49,12 +49,16 @@ enum PlateCalculator {
 
         let achievedPerSide = plates.reduce(0, +)
         let achievedTotal = barWeight + (achievedPerSide * 2)
+        let isExactMatch = abs(achievedTotal - targetWeight) < 0.01
 
+        // Only report "limited by inventory" if the cap actually prevented
+        // reaching the target -- not just skipped a plate size that turned out
+        // to be unnecessary once smaller plates covered the exact amount.
         return PlateBreakdown(
             platesPerSide: plates,
             achievedTotal: achievedTotal,
-            isExactMatch: abs(achievedTotal - targetWeight) < 0.01,
-            limitedByInventory: limitedByInventory
+            isExactMatch: isExactMatch,
+            limitedByInventory: hitInventoryCap && !isExactMatch
         )
     }
 }

@@ -81,4 +81,24 @@ final class PlateCalculatorTests: XCTestCase {
         XCTAssertTrue(result.limitedByInventory)
         XCTAssertFalse(result.isExactMatch)
     }
+    
+    func test_calculate_doesNotFlagLimitedByInventoryWhenExactMatchStillAchieved() {
+        // 25kg pair unavailable, but 20+15+... can still hit the exact target
+        // via smaller plates -- this must NOT be flagged as inventory-limited.
+        let result = PlateCalculator.calculate(
+            targetWeight: 90, barWeight: 20,
+            inventoryPerSide: [25: 0, 20: 4, 15: 4, 10: 4, 5: 4, 2.5: 4, 1.25: 4]
+        )
+        XCTAssertTrue(result.isExactMatch)
+        XCTAssertFalse(result.limitedByInventory)
+    }
+
+    func test_calculate_flagsLimitedByInventoryOnlyWhenTargetTrulyUnreachable() {
+        let result = PlateCalculator.calculate(
+            targetWeight: 200, barWeight: 20,
+            inventoryPerSide: [25: 1, 20: 1, 15: 0, 10: 0, 5: 0, 2.5: 0, 1.25: 0]
+        )
+        XCTAssertFalse(result.isExactMatch)
+        XCTAssertTrue(result.limitedByInventory)
+    }
 }
