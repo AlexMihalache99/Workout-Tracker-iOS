@@ -791,4 +791,22 @@ final class BackupManagerTests: XCTestCase {
             XCTAssertTrue(error is DecodingError, "A malformed setType should fail decoding explicitly, not silently default to a category")
         }
     }
+    
+    func test_importMerge_legacyBackupWithoutIDs_skipsContentDuplicateOnRepeatImport() throws {
+        let deadlift = TestFixtures.makeExercise(context: context, name: "Deadlift", prMetric: .weight)
+        let workout = TestFixtures.makeWorkout(context: context, date: Date(), name: "Leg Day")
+        TestFixtures.addExerciseEntry(context: context, workout: workout, exercise: deadlift, sets: [(.working, 100, 5, nil, nil)])
+        try context.save()
+
+        let backupSet = BackupSet(setType: .working, setNumber: 1, weight: 100, reps: 5, rpe: nil, rir: nil)
+        let backupEntry = BackupExerciseEntry(exerciseName: "Deadlift", sets: [backupSet], supersetGroupID: nil)
+        // Same date/name/exercise as the existing workout, but no id -- simulates a legacy export
+        let backupWorkout = BackupWorkout(id: nil, date: workout.date, name: "Leg Day", notes: nil, sessionStartTime: nil, sessionEndTime: nil, exercises: [backupEntry])
+        let backup = BackupData(version: BackupManager.currentVersion, exportedAt: .now, exercises: [], workouts: [backupWorkout])
+
+        try BackupManager.importBackup(backup, context: context, mode: .merge)
+
+        let allWorkouts = try context.fetch(FetchDescriptor<Workout>())
+        XCTAssertEqual(allWorkouts.filter { $0.name == "Leg Day" }.count, 1)
+    }
 }

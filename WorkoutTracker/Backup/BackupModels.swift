@@ -72,6 +72,12 @@ enum BackupManager {
         case merge
         case replace
     }
+    
+    private static func workoutSignature(date: Date, name: String?, exerciseNames: [String]) -> String {
+        let roundedDate = Int(date.timeIntervalSinceReferenceDate)
+        let sortedNames = exerciseNames.sorted().joined(separator: "|")
+        return "\(roundedDate)|\(name ?? "")|\(sortedNames)"
+    }
 
     // MARK: - Export
 
@@ -226,13 +232,25 @@ enum BackupManager {
 
             // MARK: Workouts
 
-            let existingWorkoutIDs: Set<UUID> = mode == .merge
-                ? Set(try context.fetch(FetchDescriptor<Workout>()).map { $0.id })
-                : []
+            let existingWorkouts = mode == .merge ? try context.fetch(FetchDescriptor<Workout>()) : []
+            let existingWorkoutIDs: Set<UUID> = Set(existingWorkouts.map { $0.id })
+            var existingSignatures: Set<String> = Set(existingWorkouts.map {
+                workoutSignature(date: $0.date, name: $0.name, exerciseNames: $0.exercises.compactMap { $0.exercise?.name })
+            })
 
             for backupWorkout in backup.workouts {
-                if mode == .merge, let backupID = backupWorkout.id, existingWorkoutIDs.contains(backupID) {
-                    continue
+                if mode == .merge {
+                    if let backupID = backupWorkout.id {
+                        if existingWorkoutIDs.contains(backupID) { continue }
+                    } else {
+                        let signature = workoutSignature(
+                            date: backupWorkout.date,
+                            name: backupWorkout.name,
+                            exerciseNames: backupWorkout.exercises.map { $0.exerciseName }
+                        )
+                        if existingSignatures.contains(signature) { continue }
+                        existingSignatures.insert(signature)
+                    }
                 }
 
                 let workout = Workout(
