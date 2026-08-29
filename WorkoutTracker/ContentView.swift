@@ -54,7 +54,7 @@ private struct ExerciseListView: View {
                         Text(exercise.name)
                             .foregroundStyle(AppTheme.textPrimary)
                         Spacer()
-                        if exercise.isMainLift {
+                        if exercise.prMetric != nil {
                             Text("PR tracked")
                                 .font(.caption)
                                 .foregroundStyle(AppTheme.textSecondary)
