@@ -610,4 +610,74 @@ final class BackupManagerTests: XCTestCase {
         let allExercises = try context.fetch(FetchDescriptor<Exercise>())
         XCTAssertEqual(allExercises.map { $0.name }, ["Squat"])
     }
+    
+    func test_importMerge_isIdempotentOnRepeatImport() throws {
+        let deadlift = TestFixtures.makeExercise(context: context, name: "Deadlift", prMetric: .weight)
+        let workout = TestFixtures.makeWorkout(context: context, date: Date(), name: "Session A")
+        TestFixtures.addExerciseEntry(context: context, workout: workout, exercise: deadlift, sets: [(.working, 100, 5, nil, nil)])
+        try context.save()
+
+        let backup = try BackupManager.buildBackup(context: context)
+
+        // Import the exact same backup twice in Merge mode.
+        try BackupManager.importBackup(backup, context: context, mode: .merge)
+        try BackupManager.importBackup(backup, context: context, mode: .merge)
+
+        let allWorkouts = try context.fetch(FetchDescriptor<Workout>())
+        XCTAssertEqual(allWorkouts.filter { $0.name == "Session A" }.count, 1)
+    }
+
+    func test_importMerge_doesNotOverwriteExistingExerciseMetadata() throws {
+        let chinUp = TestFixtures.makeExercise(context: context, name: "Chin-Up", prMetric: .reps)
+        chinUp.notes = "Current notes I don't want overwritten"
+        try context.save()
+
+        // An older backup where Chin-Up had different settings
+        let backupExercise = BackupExercise(name: "Chin-Up", category: "Accessory", isMainLift: false, prMetric: .weight, notes: "Old stale note")
+        let backup = BackupData(version: BackupManager.currentVersion, exportedAt: .now, exercises: [backupExercise], workouts: [])
+
+        try BackupManager.importBackup(backup, context: context, mode: .merge)
+
+        let allExercises = try context.fetch(FetchDescriptor<Exercise>())
+        let restoredChinUp = allExercises.first { $0.name == "Chin-Up" }
+        XCTAssertEqual(restoredChinUp?.prMetric, .reps)   // unchanged, not overwritten to .weight
+        XCTAssertEqual(restoredChinUp?.notes, "Current notes I don't want overwritten")
+    }
+
+    func test_importMerge_stillAddsNewExercisesAndWorkouts() throws {
+        let bench = TestFixtures.makeExercise(context: context, name: "Bench Press", prMetric: .weight)
+        let existingWorkout = TestFixtures.makeWorkout(context: context, date: Date(), name: "Existing Session")
+        TestFixtures.addExerciseEntry(context: context, workout: existingWorkout, exercise: bench, sets: [(.working, 80, 5, nil, nil)])
+        try context.save()
+
+        let backupExercise = BackupExercise(name: "Squat", category: "Big 3", isMainLift: true, prMetric: .weight, notes: nil)
+        let backupSet = BackupSet(setType: "working", setNumber: 1, weight: 100, reps: 5, rpe: nil, rir: nil)
+        let backupEntry = BackupExerciseEntry(exerciseName: "Squat", sets: [backupSet], supersetGroupID: nil)
+        let backupWorkout = BackupWorkout(id: UUID(), date: Date(), name: "New Session", notes: nil, sessionStartTime: nil, sessionEndTime: nil, exercises: [backupEntry])
+        let backup = BackupData(version: BackupManager.currentVersion, exportedAt: .now, exercises: [backupExercise], workouts: [backupWorkout])
+
+        try BackupManager.importBackup(backup, context: context, mode: .merge)
+
+        let allWorkouts = try context.fetch(FetchDescriptor<Workout>())
+        XCTAssertEqual(allWorkouts.count, 2)
+
+        let allExercises = try context.fetch(FetchDescriptor<Exercise>())
+        XCTAssertTrue(allExercises.contains { $0.name == "Squat" })
+        XCTAssertTrue(allExercises.contains { $0.name == "Bench Press" })
+    }
+
+    func test_importMerge_backupWithoutIDs_stillImportsSuccessfully() throws {
+        // Simulates a pre-upgrade backup file with no workout IDs at all.
+        let backupExercise = BackupExercise(name: "Deadlift", category: "Big 3", isMainLift: true, prMetric: .weight, notes: nil)
+        let backupSet = BackupSet(setType: "working", setNumber: 1, weight: 140, reps: 3, rpe: nil, rir: nil)
+        let backupEntry = BackupExerciseEntry(exerciseName: "Deadlift", sets: [backupSet], supersetGroupID: nil)
+        let backupWorkout = BackupWorkout(id: nil, date: Date(), name: "Legacy Session", notes: nil, sessionStartTime: nil, sessionEndTime: nil, exercises: [backupEntry])
+        let backup = BackupData(version: BackupManager.currentVersion, exportedAt: .now, exercises: [backupExercise], workouts: [backupWorkout])
+
+        try BackupManager.importBackup(backup, context: context, mode: .merge)
+
+        let allWorkouts = try context.fetch(FetchDescriptor<Workout>())
+        XCTAssertEqual(allWorkouts.count, 1)
+        XCTAssertEqual(allWorkouts.first?.name, "Legacy Session")
+    }
 }

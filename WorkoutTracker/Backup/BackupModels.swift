@@ -32,6 +32,7 @@ struct BackupExerciseEntry: Codable {
 }
 
 struct BackupWorkout: Codable {
+    var id: UUID?
     var date: Date
     var name: String?
     var notes: String?
@@ -117,13 +118,14 @@ enum BackupManager {
             }
 
             return BackupWorkout(
-                date: workout.date,
-                name: workout.name,
-                notes: workout.notes,
-                sessionStartTime: workout.sessionStartTime,
-                sessionEndTime: workout.sessionEndTime,
-                exercises: entries
-            )
+                    id: workout.id,
+                    date: workout.date,
+                    name: workout.name,
+                    notes: workout.notes,
+                    sessionStartTime: workout.sessionStartTime,
+                    sessionEndTime: workout.sessionEndTime,
+                    exercises: entries
+                )
         }
 
         return BackupData(
@@ -175,7 +177,6 @@ enum BackupManager {
                 for workout in existingWorkouts {
                     context.delete(workout)
                 }
-
                 let existingExercises = try context.fetch(FetchDescriptor<Exercise>())
                 for exercise in existingExercises {
                     context.delete(exercise)
@@ -191,31 +192,36 @@ enum BackupManager {
             }
 
             for backupExercise in backup.exercises {
-                if let existingExercise = exerciseByName[backupExercise.name] {
-                    existingExercise.category = backupExercise.category
-                    existingExercise.isMainLift = backupExercise.isMainLift
-                    existingExercise.prMetric = backupExercise.prMetric
-                    existingExercise.notes = backupExercise.notes
-                } else {
-                    let newExercise = Exercise(
-                        name: backupExercise.name,
-                        category: backupExercise.category,
-                        isMainLift: backupExercise.isMainLift,
-                        prMetric: backupExercise.prMetric,
-                        notes: backupExercise.notes
-                    )
-                    context.insert(newExercise)
-                    exerciseByName[backupExercise.name] = newExercise
+                if exerciseByName[backupExercise.name] != nil {
+                    continue
                 }
+                let newExercise = Exercise(
+                    name: backupExercise.name,
+                    category: backupExercise.category,
+                    isMainLift: backupExercise.isMainLift,
+                    prMetric: backupExercise.prMetric,
+                    notes: backupExercise.notes
+                )
+                context.insert(newExercise)
+                exerciseByName[backupExercise.name] = newExercise
             }
 
             // MARK: Workouts
 
+            let existingWorkoutIDs: Set<UUID> = mode == .merge
+                ? Set(try context.fetch(FetchDescriptor<Workout>()).map { $0.id })
+                : []
+
             for backupWorkout in backup.workouts {
+                if mode == .merge, let backupID = backupWorkout.id, existingWorkoutIDs.contains(backupID) {
+                    continue
+                }
+
                 let workout = Workout(
                     date: backupWorkout.date,
                     name: backupWorkout.name,
-                    notes: backupWorkout.notes
+                    notes: backupWorkout.notes,
+                    id: backupWorkout.id ?? UUID()
                 )
                 workout.sessionStartTime = backupWorkout.sessionStartTime
                 workout.sessionEndTime = backupWorkout.sessionEndTime
@@ -259,6 +265,7 @@ enum BackupManager {
                     workout.exercises.append(entry)
                 }
             }
+
             try context.save()
 
         } catch {

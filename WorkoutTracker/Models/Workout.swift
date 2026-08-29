@@ -10,6 +10,7 @@ import SwiftData
 
 @Model
 final class Workout {
+    var id: UUID = UUID()
     var date: Date
     var name: String?
     var notes: String?
@@ -19,7 +20,8 @@ final class Workout {
     @Relationship(deleteRule: .cascade)
     var exercises: [ExerciseEntry] = []
 
-    init(date: Date = .now, name: String? = nil, notes: String? = nil) {
+    init(date: Date = .now, name: String? = nil, notes: String? = nil, id: UUID = UUID()) {
+        self.id = id
         self.date = date
         self.name = name
         self.notes = notes
@@ -36,7 +38,7 @@ final class Workout {
     var totalVolume: Double {
         exercises.reduce(0) { $0 + $1.totalVolume }
     }
-    
+
     func totalTrainingVolume(bodyweightKg: Double) -> Double {
         exercises.reduce(0) { $0 + $1.totalTrainingVolume(bodyweightKg: bodyweightKg) }
     }
