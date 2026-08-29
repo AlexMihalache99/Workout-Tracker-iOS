@@ -70,36 +70,18 @@ private struct WeightProgressCard: View {
         _allEntries = Query(filter: #Predicate<ExerciseEntry> { $0.exercise?.name == name })
     }
 
-    private struct DataPoint: Identifiable {
-        let id = UUID()
-        let date: Date
-        let maxWeight: Double
-    }
-
     private var plateColor: Color { PlateColor.forExercise(exercise.name) }
-
-    private var dataPoints: [DataPoint] {
-        allEntries
-            .compactMap { entry -> DataPoint? in
-                guard let date = entry.workout?.date,
-                      let sessionMax = entry.workingSets.map({ $0.weight }).max() else { return nil }
-                return DataPoint(date: date, maxWeight: sessionMax)
-            }
-            .sorted { $0.date < $1.date }
-    }
-
-    private var personalRecord: Double? { dataPoints.map { $0.maxWeight }.max() }
-    private var lastSessionWeight: Double? { dataPoints.last?.maxWeight }
-
+    private var dataPoints: [PRDataPoint] { PRCalculator.weightDataPoints(entries: allEntries) }
+    private var personalRecord: Double? { PRCalculator.weightPR(entries: allEntries) }
+    private var lastSessionWeight: Double? { dataPoints.last?.value }
     private var bodyweightRatio: String? {
-        guard bodyweightKg > 0, let pr = personalRecord else { return nil }
-        return String(format: "%.2fx bodyweight", pr / bodyweightKg)
+        guard let ratio = PRCalculator.bodyweightRatio(prWeightKg: personalRecord, bodyweightKg: bodyweightKg) else { return nil }
+        return String(format: "%.2fx bodyweight", ratio)
     }
 
     var body: some View {
         HStack(spacing: 0) {
             Rectangle().fill(plateColor).frame(width: 5)
-
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -117,7 +99,6 @@ private struct WeightProgressCard: View {
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundStyle(AppTheme.textSecondary)
                             }
-
                             if let ratio = bodyweightRatio {
                                 Text(ratio)
                                     .font(.system(size: 12, weight: .medium))
@@ -139,10 +120,10 @@ private struct WeightProgressCard: View {
 
                 if dataPoints.count >= 2 {
                     Chart(dataPoints) { point in
-                        LineMark(x: .value("Date", point.date), y: .value("Weight", weightUnit.fromKg(point.maxWeight)))
+                        LineMark(x: .value("Date", point.date), y: .value("Weight", weightUnit.fromKg(point.value)))
                             .interpolationMethod(.monotone)
                             .foregroundStyle(plateColor)
-                        PointMark(x: .value("Date", point.date), y: .value("Weight", weightUnit.fromKg(point.maxWeight)))
+                        PointMark(x: .value("Date", point.date), y: .value("Weight", weightUnit.fromKg(point.value)))
                             .foregroundStyle(plateColor)
                     }
                     .frame(height: 120)
@@ -168,10 +149,8 @@ private struct WeightProgressCard: View {
     }
 }
 
-
 private struct RepsProgressCard: View {
     let exercise: Exercise
-
     @Query private var allEntries: [ExerciseEntry]
 
     init(exercise: Exercise) {
@@ -180,33 +159,14 @@ private struct RepsProgressCard: View {
         _allEntries = Query(filter: #Predicate<ExerciseEntry> { $0.exercise?.name == name })
     }
 
-    private struct DataPoint: Identifiable {
-        let id = UUID()
-        let date: Date
-        let maxReps: Int
-    }
-
     private var plateColor: Color { PlateColor.forExercise(exercise.name) }
-
-    // Only bodyweight (0kg) sets count toward the reps PR
-    private var dataPoints: [DataPoint] {
-        allEntries
-            .compactMap { entry -> DataPoint? in
-                guard let date = entry.workout?.date else { return nil }
-                let bodyweightSets = entry.workingSets.filter { $0.weight == 0 }
-                guard let sessionMax = bodyweightSets.map({ $0.reps }).max() else { return nil }
-                return DataPoint(date: date, maxReps: sessionMax)
-            }
-            .sorted { $0.date < $1.date }
-    }
-
-    private var personalRecord: Int? { dataPoints.map { $0.maxReps }.max() }
-    private var lastSessionReps: Int? { dataPoints.last?.maxReps }
+    private var dataPoints: [PRDataPoint] { PRCalculator.repsDataPoints(entries: allEntries) }
+    private var personalRecord: Int? { PRCalculator.repsPR(entries: allEntries) }
+    private var lastSessionReps: Int? { dataPoints.last.map { Int($0.value) } }
 
     var body: some View {
         HStack(spacing: 0) {
             Rectangle().fill(plateColor).frame(width: 5)
-
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -243,10 +203,10 @@ private struct RepsProgressCard: View {
 
                 if dataPoints.count >= 2 {
                     Chart(dataPoints) { point in
-                        LineMark(x: .value("Date", point.date), y: .value("Reps", point.maxReps))
+                        LineMark(x: .value("Date", point.date), y: .value("Reps", point.value))
                             .interpolationMethod(.monotone)
                             .foregroundStyle(plateColor)
-                        PointMark(x: .value("Date", point.date), y: .value("Reps", point.maxReps))
+                        PointMark(x: .value("Date", point.date), y: .value("Reps", point.value))
                             .foregroundStyle(plateColor)
                     }
                     .frame(height: 120)
@@ -286,33 +246,14 @@ private struct AssistedProgressCard: View {
         _allEntries = Query(filter: #Predicate<ExerciseEntry> { $0.exercise?.name == name })
     }
 
-    private struct DataPoint: Identifiable {
-        let id = UUID()
-        let date: Date
-        let effectiveLoad: Double
-    }
-
     private var plateColor: Color { PlateColor.forExercise(exercise.name) }
-
-    // Least assistance in a session = highest effective load = best session
-    private var dataPoints: [DataPoint] {
-        guard bodyweightKg > 0 else { return [] }
-        return allEntries
-            .compactMap { entry -> DataPoint? in
-                guard let date = entry.workout?.date,
-                      let minAssistance = entry.workingSets.map({ $0.weight }).min() else { return nil }
-                return DataPoint(date: date, effectiveLoad: bodyweightKg - minAssistance)
-            }
-            .sorted { $0.date < $1.date }
-    }
-
-    private var personalRecord: Double? { dataPoints.map { $0.effectiveLoad }.max() }
-    private var lastSessionLoad: Double? { dataPoints.last?.effectiveLoad }
+    private var dataPoints: [PRDataPoint] { PRCalculator.assistedDataPoints(entries: allEntries, bodyweightKg: bodyweightKg) }
+    private var personalRecord: Double? { PRCalculator.assistedPR(entries: allEntries, bodyweightKg: bodyweightKg) }
+    private var lastSessionLoad: Double? { dataPoints.last?.value }
 
     var body: some View {
         HStack(spacing: 0) {
             Rectangle().fill(plateColor).frame(width: 5)
-
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -353,10 +294,10 @@ private struct AssistedProgressCard: View {
 
                 if dataPoints.count >= 2 {
                     Chart(dataPoints) { point in
-                        LineMark(x: .value("Date", point.date), y: .value("Load", weightUnit.fromKg(point.effectiveLoad)))
+                        LineMark(x: .value("Date", point.date), y: .value("Load", weightUnit.fromKg(point.value)))
                             .interpolationMethod(.monotone)
                             .foregroundStyle(plateColor)
-                        PointMark(x: .value("Date", point.date), y: .value("Load", weightUnit.fromKg(point.effectiveLoad)))
+                        PointMark(x: .value("Date", point.date), y: .value("Load", weightUnit.fromKg(point.value)))
                             .foregroundStyle(plateColor)
                     }
                     .frame(height: 120)
