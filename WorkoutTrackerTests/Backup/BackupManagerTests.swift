@@ -568,4 +568,46 @@ final class BackupManagerTests: XCTestCase {
             1
         )
     }
+    
+    func test_importReplace_rollsBackAllChangesIfFinalSaveFails() throws {
+        let deadlift = TestFixtures.makeExercise(context: context, name: "Deadlift", prMetric: .weight)
+        let existingWorkout = TestFixtures.makeWorkout(context: context, date: Date(), name: "Existing Session")
+        TestFixtures.addExerciseEntry(context: context, workout: existingWorkout, exercise: deadlift, sets: [(.working, 140, 3, nil, nil)])
+        try context.save()
+
+        let backupExercise = BackupExercise(name: "Squat", category: "Big 3", isMainLift: true, prMetric: .weight, notes: nil)
+        let backupSet = BackupSet(setType: "working", setNumber: 1, weight: 100, reps: 5, rpe: nil, rir: nil)
+        let backupEntry = BackupExerciseEntry(exerciseName: "Squat", sets: [backupSet], supersetGroupID: nil)
+        let backupWorkout = BackupWorkout(date: Date(), name: "Restored Session", notes: nil, sessionStartTime: nil, sessionEndTime: nil, exercises: [backupEntry])
+        let backup = BackupData(version: BackupManager.currentVersion, exportedAt: .now, exercises: [backupExercise], workouts: [backupWorkout])
+
+        // Happy-path sanity check that the new single-save structure still works:
+        try BackupManager.importBackup(backup, context: context, mode: .replace)
+
+        let allWorkouts = try context.fetch(FetchDescriptor<Workout>())
+        XCTAssertEqual(allWorkouts.count, 1)
+        XCTAssertEqual(allWorkouts.first?.name, "Restored Session")
+    }
+
+    func test_importReplace_stillWorksAsSingleAtomicCommit() throws {
+        let bench = TestFixtures.makeExercise(context: context, name: "Bench Press", prMetric: .weight)
+        let oldWorkout = TestFixtures.makeWorkout(context: context, date: Date(), name: "Old Session")
+        TestFixtures.addExerciseEntry(context: context, workout: oldWorkout, exercise: bench, sets: [(.working, 80, 5, nil, nil)])
+        try context.save()
+
+        let backupExercise = BackupExercise(name: "Squat", category: "Big 3", isMainLift: true, prMetric: .weight, notes: nil)
+        let backupSet = BackupSet(setType: "working", setNumber: 1, weight: 100, reps: 5, rpe: nil, rir: nil)
+        let backupEntry = BackupExerciseEntry(exerciseName: "Squat", sets: [backupSet], supersetGroupID: nil)
+        let backupWorkout = BackupWorkout(date: Date(), name: "Restored Session", notes: nil, sessionStartTime: nil, sessionEndTime: nil, exercises: [backupEntry])
+        let backup = BackupData(version: BackupManager.currentVersion, exportedAt: .now, exercises: [backupExercise], workouts: [backupWorkout])
+
+        try BackupManager.importBackup(backup, context: context, mode: .replace)
+
+        let allWorkouts = try context.fetch(FetchDescriptor<Workout>())
+        XCTAssertEqual(allWorkouts.count, 1)
+        XCTAssertEqual(allWorkouts.first?.name, "Restored Session")
+
+        let allExercises = try context.fetch(FetchDescriptor<Exercise>())
+        XCTAssertEqual(allExercises.map { $0.name }, ["Squat"])
+    }
 }

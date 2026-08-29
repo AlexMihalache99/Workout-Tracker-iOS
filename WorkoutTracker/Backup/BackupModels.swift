@@ -168,149 +168,102 @@ enum BackupManager {
         mode: ImportMode
     ) throws {
 
-        // MARK: Replace
+        do {
+            // MARK: Replace
+            if mode == .replace {
+                let existingWorkouts = try context.fetch(FetchDescriptor<Workout>())
+                for workout in existingWorkouts {
+                    context.delete(workout)
+                }
 
-        if mode == .replace {
-            let existingWorkouts = try context.fetch(
-                FetchDescriptor<Workout>()
-            )
-
-            for workout in existingWorkouts {
-                context.delete(workout)
+                let existingExercises = try context.fetch(FetchDescriptor<Exercise>())
+                for exercise in existingExercises {
+                    context.delete(exercise)
+                }
             }
 
-            let existingExercises = try context.fetch(
-                FetchDescriptor<Exercise>()
-            )
+            // MARK: Exercise catalog
 
+            var exerciseByName: [String: Exercise] = [:]
+            let existingExercises = try context.fetch(FetchDescriptor<Exercise>())
             for exercise in existingExercises {
-                context.delete(exercise)
+                exerciseByName[exercise.name] = exercise
             }
 
-            try context.save()
-        }
-
-        // MARK: Exercise catalog
-
-        var exerciseByName: [String: Exercise] = [:]
-
-        let existingExercises = try context.fetch(
-            FetchDescriptor<Exercise>()
-        )
-
-        for exercise in existingExercises {
-            exerciseByName[exercise.name] = exercise
-        }
-
-        for backupExercise in backup.exercises {
-
-            if let existingExercise = exerciseByName[backupExercise.name] {
-
-                // Restore metadata from backup.
-                existingExercise.category = backupExercise.category
-                existingExercise.isMainLift = backupExercise.isMainLift
-                existingExercise.prMetric = backupExercise.prMetric
-                existingExercise.notes = backupExercise.notes
-
-            } else {
-
-                let newExercise = Exercise(
-                    name: backupExercise.name,
-                    category: backupExercise.category,
-                    isMainLift: backupExercise.isMainLift,
-                    prMetric: backupExercise.prMetric,
-                    notes: backupExercise.notes
-                )
-
-                context.insert(newExercise)
-
-                exerciseByName[backupExercise.name] = newExercise
-            }
-        }
-
-        // MARK: Workouts
-
-        for backupWorkout in backup.workouts {
-
-            let workout = Workout(
-                date: backupWorkout.date,
-                name: backupWorkout.name,
-                notes: backupWorkout.notes
-            )
-
-            workout.sessionStartTime = backupWorkout.sessionStartTime
-            workout.sessionEndTime = backupWorkout.sessionEndTime
-
-            context.insert(workout)
-
-            for backupEntry in backupWorkout.exercises {
-
-                // IMPORTANT:
-                // An exercise entry must never silently disappear.
-                //
-                // Normally the exercise should already exist in
-                // backup.exercises. But if an older/corrupt backup
-                // contains an entry whose exercise is missing from
-                // the catalog, create a fallback exercise instead
-                // of dropping the entry.
-
-                let exercise: Exercise
-
-                if let existingExercise = exerciseByName[backupEntry.exerciseName] {
-
-                    exercise = existingExercise
-
+            for backupExercise in backup.exercises {
+                if let existingExercise = exerciseByName[backupExercise.name] {
+                    existingExercise.category = backupExercise.category
+                    existingExercise.isMainLift = backupExercise.isMainLift
+                    existingExercise.prMetric = backupExercise.prMetric
+                    existingExercise.notes = backupExercise.notes
                 } else {
-
-                    let recoveredExercise = Exercise(
-                        name: backupEntry.exerciseName,
-                        category: "Imported",
-                        isMainLift: false
+                    let newExercise = Exercise(
+                        name: backupExercise.name,
+                        category: backupExercise.category,
+                        isMainLift: backupExercise.isMainLift,
+                        prMetric: backupExercise.prMetric,
+                        notes: backupExercise.notes
                     )
-
-                    context.insert(recoveredExercise)
-
-                    exerciseByName[backupEntry.exerciseName] = recoveredExercise
-
-                    exercise = recoveredExercise
+                    context.insert(newExercise)
+                    exerciseByName[backupExercise.name] = newExercise
                 }
-
-                let entry = ExerciseEntry(
-                    exercise: exercise
-                )
-
-                entry.workout = workout
-                entry.supersetGroupID = backupEntry.supersetGroupID
-
-                context.insert(entry)
-
-                for backupSet in backupEntry.sets {
-
-                    let type: SetType =
-                        backupSet.setType == "warmup"
-                        ? .warmup
-                        : .working
-
-                    let set = SetEntry(
-                        setType: type,
-                        setNumber: backupSet.setNumber,
-                        weight: backupSet.weight,
-                        reps: backupSet.reps,
-                        rpe: backupSet.rpe,
-                        rir: backupSet.rir
-                    )
-
-                    set.exerciseEntry = entry
-
-                    context.insert(set)
-
-                    entry.sets.append(set)
-                }
-
-                workout.exercises.append(entry)
             }
-        }
 
-        try context.save()
+            // MARK: Workouts
+
+            for backupWorkout in backup.workouts {
+                let workout = Workout(
+                    date: backupWorkout.date,
+                    name: backupWorkout.name,
+                    notes: backupWorkout.notes
+                )
+                workout.sessionStartTime = backupWorkout.sessionStartTime
+                workout.sessionEndTime = backupWorkout.sessionEndTime
+                context.insert(workout)
+
+                for backupEntry in backupWorkout.exercises {
+                    let exercise: Exercise
+                    if let existingExercise = exerciseByName[backupEntry.exerciseName] {
+                        exercise = existingExercise
+                    } else {
+                        let recoveredExercise = Exercise(
+                            name: backupEntry.exerciseName,
+                            category: "Imported",
+                            isMainLift: false
+                        )
+                        context.insert(recoveredExercise)
+                        exerciseByName[backupEntry.exerciseName] = recoveredExercise
+                        exercise = recoveredExercise
+                    }
+
+                    let entry = ExerciseEntry(exercise: exercise)
+                    entry.workout = workout
+                    entry.supersetGroupID = backupEntry.supersetGroupID
+                    context.insert(entry)
+
+                    for backupSet in backupEntry.sets {
+                        let type: SetType = backupSet.setType == "warmup" ? .warmup : .working
+                        let set = SetEntry(
+                            setType: type,
+                            setNumber: backupSet.setNumber,
+                            weight: backupSet.weight,
+                            reps: backupSet.reps,
+                            rpe: backupSet.rpe,
+                            rir: backupSet.rir
+                        )
+                        set.exerciseEntry = entry
+                        context.insert(set)
+                        entry.sets.append(set)
+                    }
+
+                    workout.exercises.append(entry)
+                }
+            }
+            try context.save()
+
+        } catch {
+            context.rollback()
+            throw error
+        }
     }
 }
