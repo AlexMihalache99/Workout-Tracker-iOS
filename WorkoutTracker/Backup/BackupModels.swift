@@ -52,14 +52,16 @@ struct BackupData: Codable {
 enum BackupError: LocalizedError {
     case fileAccessDenied
     case unsupportedVersion(Int)
+    case duplicateExerciseName(String)
 
     var errorDescription: String? {
         switch self {
         case .fileAccessDenied:
             return "Couldn't access the selected file."
-
         case .unsupportedVersion(let v):
             return "This backup (version \(v)) isn't supported by this version of the app."
+        case .duplicateExerciseName(let name):
+            return "This backup contains more than one exercise named \"\(name)\". The file may be corrupted."
         }
     }
 }
@@ -185,6 +187,13 @@ enum BackupManager {
         guard backup.version <= currentVersion else {
             throw BackupError.unsupportedVersion(backup.version)
         }
+
+        let names = backup.exercises.map { $0.name }
+        let duplicateCounts = Dictionary(grouping: names, by: { $0 }).filter { $0.value.count > 1 }
+        if let firstDuplicate = duplicateCounts.keys.first {
+            throw BackupError.duplicateExerciseName(firstDuplicate)
+        }
+
         return BackupMigrator.migrate(backup)
     }
 

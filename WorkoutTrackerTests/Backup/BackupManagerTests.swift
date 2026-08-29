@@ -809,4 +809,21 @@ final class BackupManagerTests: XCTestCase {
         let allWorkouts = try context.fetch(FetchDescriptor<Workout>())
         XCTAssertEqual(allWorkouts.filter { $0.name == "Leg Day" }.count, 1)
     }
+    
+    func test_decode_throwsOnDuplicateExerciseNameInBackup() throws {
+        let duplicated = [
+            BackupExercise(name: "Deadlift", category: "Big 3", isMainLift: true, prMetric: .weight, notes: nil),
+            BackupExercise(name: "Deadlift", category: "Big 3", isMainLift: true, prMetric: nil, notes: "conflicting entry")
+        ]
+        let backup = BackupData(version: BackupManager.currentVersion, exportedAt: .now, exercises: duplicated, workouts: [])
+        let data = try BackupManager.encode(backup)
+
+        XCTAssertThrowsError(try BackupManager.decode(data)) { error in
+            guard case BackupError.duplicateExerciseName(let name) = error else {
+                XCTFail("Expected duplicateExerciseName, got \(error)")
+                return
+            }
+            XCTAssertEqual(name, "Deadlift")
+        }
+    }
 }
