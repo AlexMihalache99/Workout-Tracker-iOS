@@ -142,13 +142,12 @@ Weights are stored in kilograms internally. The selected display unit only chang
 - [x] WorkoutDetail edits rely on autosave.
 
 ### P2 — cleanup / latent risk, no current functional impact
-- [ ] HealthKitManager contains dead calorie-estimation code.
-- [ ] HealthKit authorization API has slightly confusing semantics.
-- [ ] HealthKit's hasWorkoutWriteAuthorization requires two permissions.
-- [ ] SetEditorView has a small warm-up invariant hole; new-set path correctly strips effort data from warm-ups, but the existing-set path doesn't explicitly enforce the same rule.
-- [ ] Rest-timer behavior for supersets needs more testing; The basic alternating case looks sensible, but this is stateful behavior that is easy to get subtly wrong when: one exercise has more sets than the other, one exercise is deleted, a superset is unlinked, sets are deleted, a user logs exercises out of sequence.
-- [ ] Date.now makes some logic harder to test deterministically; I'd apply the same philosophy more broadly to date-sensitive report/session logic; It will make edge cases such as:end of month, start of week, DST transition, end date, future date.
-- [ ] Report language says "RPE" even when effort came from RIR.
-- [ ] Some report wording still says "week-1" when it's actually the first session.
-- [ ] BackupError.fileAccessDenied unused.
+- [x] HealthKitManager contains dead calorie-estimation code.
+- [x] HealthKit authorization API has slightly confusing semantics.
+- [x] HealthKit's hasWorkoutWriteAuthorization requires two permissions.
+- [x] SetEditorView has a small warm-up invariant hole; new-set path correctly strips effort data from warm-ups, but the existing-set path doesn't explicitly enforce the same rule.
+- [x] Rest-timer behavior for supersets needs more testing; The basic alternating case looks sensible, but this is stateful behavior that is easy to get subtly wrong when: one exercise has more sets than the other, one exercise is deleted, a superset is unlinked, sets are deleted, a user logs exercises out of sequence.
+- [x] Date.now makes some logic harder to test deterministically; I'd apply the same philosophy more broadly to date-sensitive report/session logic; It will make edge cases such as:end of month, start of week, DST transition, end date, future date.
+- [x] Report language says "RPE" even when effort came from RIR.
+- [x] Some report wording still says "week-1" when it's actually the first session.
 - [ ] Plate Calculator option visible for dumbbells/machine exercises, not applicable, should be present only for the main lifts. (PlateCalculator.swift, WorkoutSessionView.swift)
