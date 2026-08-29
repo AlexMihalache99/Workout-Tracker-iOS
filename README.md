@@ -133,27 +133,22 @@ Weights are stored in kilograms internally. The selected display unit only chang
 
 # Known Issues / Remediation Backlog
 
-### P0 — breaks a feature or risks silent data loss
-- [x] Replace-mode import isn't atomic — existing workouts/exercises are deleted and committed via an early `try context.save()`, then the new data is rebuilt and only saved once at the very end. If that final save throws, the delete already landed: the user is left with a genuinely empty database, not a "failed, nothing changed" state. (BackupModels.swift — `importBackup`)
-- [x] Merge-mode import duplicates workouts on repeat import — every backup workout is unconditionally inserted as new, with no identity/dedup check. Importing the same file twice in Merge mode doubles the workout history. (BackupModels.swift — `importBackup`)
-- [x] Merge-mode import silently overwrites existing exercise metadata — even in `.merge` mode, an exercise matched by name has its `category`, `isMainLift`, `prMetric`, and `notes` unconditionally overwritten from the backup file, reverting any changes made since that backup was taken. "Merge" reads as additive but isn't. (BackupModels.swift — `importBackup`)
-- [ ] Report screen's volume figures aren't bodyweight-aware — `ReportGenerator`'s `weeklyStats` and `report.totalVolume` still use raw `weight × reps` instead of the `totalTrainingVolume(bodyweightKg:)` fix already applied to `Workout`/`ExerciseEntry`. `bodyweightKg` is passed into `generate(...)` and used correctly for `.assisted` PR calc and bodyweight ratio, but never threaded into the volume totals — so the Report tab's Total Volume, weekly breakdown, and "volume trended up/down" insight are still wrong for bodyweight/assisted exercises. (ReportGenerator.swift)
-
-### P1 — real correctness/reliability issues, narrower scope
-- [x] `BackupSet.setType` is stringly typed — uses raw `String` values ("warmup"/"working") instead of a `Codable` representation of `SetType`, so any invalid or corrupted value is silently interpreted as `.working` on import with no validation or error. (BackupModels.swift, SetEntry.swift)
-- [x] Backup versioning has no migration layer — `decode` correctly rejects future versions, but there's no mechanism to migrate an older backup schema forward as the model evolves. Will become a real compatibility problem once the format changes beyond v1. (BackupModels.swift)
-- [x] Rest-timer duration override is sticky across exercises — `pendingRestDuration` is set when picking an override (e.g. "5 min rest") from one exercise's Working Set menu, but is never reset to `nil` after being consumed. It silently applies to every subsequent working set for the rest of the session, across all exercises, until "Use default" is explicitly picked again. (NewWorkoutView.swift)
-- [x] `PRDashboardView` doesn't use `PRCalculator` — the three card views (`WeightProgressCard`, `RepsProgressCard`, `AssistedProgressCard`) each have their own independent, duplicated inline PR logic rather than calling the extracted, unit-tested `PRCalculator`. A future fix to `PRCalculator` won't reach the actual PR Dashboard screen. (PRDashboardView.swift, PRCalculator.swift)
-- [x] "PR tracked" badge in the Exercises tab reads the wrong field — `ContentView.swift`'s `ExerciseListView` checks `exercise.isMainLift` (a vestigial migration-only field) instead of `exercise.prMetric != nil`. Turning tracking on for a non-main-lift exercise via the picker never shows the badge; turning it off for a main lift never removes it. (ContentView.swift)
-- [x] No upper bound on workout date entry — `NewWorkoutView`'s `DatePicker` for a workout's date has no `in:` range restricting it to present/past, so a workout can be dated arbitrarily in the future. `ConsistencyCalculator`'s `longestStreak` (via `weeksWithActivity`) is still built from the unbounded workout list and can be inflated by a mis-dated entry, even though `avgSessionsPerWeek` was already fixed against this. (NewWorkoutView.swift, ConsistencyCalculator.swift)
-- [x] HealthKit calorie estimate is a flat `sets × 6` — not based on duration, bodyweight, or intensity, so the active-energy value written to Health can be meaningfully misleading. (HealthKitManager.swift)
+### P1 — real correctness/reliability issues
+- [ ] Report date range excludes most workouts on the selected end date; A date-only picker generally gives you midnight at the beginning of the selected day.
+- [ ] Assisted PR/report calculations can produce negative effective load.
+- [ ] Merge idempotency only works when the backup contains workout IDs.
+- [ ] Duplicate exercise names inside a backup can collapse into one exercise.
+- [ ] ExerciseDetail changes rely on implicit persistence.
+- [ ] WorkoutDetail edits rely on autosave.
 
 ### P2 — cleanup / latent risk, no current functional impact
-- [x] Plate-inventory "limited" flag can misfire alongside an exact match — hitting a zero-inventory plate size sets `limitedByInventory = true` immediately, even if the algorithm goes on to reach the exact target with smaller plates. The UI can show a correct exact breakdown next to a contradictory "you'd need more plates" warning. (PlateCalculator.swift, PlateCalculatorView.swift)
-- [x] Warm-up Suggester ignores the plate-inventory setting — `WarmupSuggestionView.plateBreakdownText` calls `PlateCalculator.calculate` without passing `inventoryPerSide`, unlike the standalone Plate Calculator screen. Same feature, inconsistent behavior depending on entry point. (WarmupSuggestionView.swift)
-- [x] `SetEntry` invariant clamping doesn't cover in-place edits — `SetEditorView`'s edit path mutates `existing.weight/reps/rpe/rir` directly, bypassing both `init`'s clamping and `.normalize()`. Not exploitable through the current UI (which already constrains input), but the invariant enforcement is architecturally incomplete. (SetEditorView.swift, SetEntry.swift)
-- [x] Backup does not explicitly preserve exercise/workout ordering — relies on SwiftData relationship array order rather than an explicit ordering field; less robust than it looks for exact restoration. (BackupModels.swift, Workout.swift, ExerciseEntry.swift)
-- [x] Test coverage gap on backup invariants — existing tests cover round-trip basics, future-version rejection, replace, merge, and the missing-exercise recovery case, but don't cover repeat-merge duplication, metadata-overwrite-on-merge, or malformed `setType` strings — i.e., they don't currently catch any of the P0/P1 backup issues above. (BackupManagerTests.swift)
-- [ ] ~~Unit/UI test workflow isn't clearly separated in Xcode's Test navigator/test-plan UI, even though CLI/scheme-based runs work correctly. (Xcode test configuration)~~
-- [x] Effort Tracking section should not appear for warm-up sets; only weight and reps text fields should appear. (SetEditorView.swift)
+- [ ] HealthKitManager contains dead calorie-estimation code.
+- [ ] HealthKit authorization API has slightly confusing semantics.
+- [ ] HealthKit's hasWorkoutWriteAuthorization requires two permissions.
+- [ ] SetEditorView has a small warm-up invariant hole; new-set path correctly strips effort data from warm-ups, but the existing-set path doesn't explicitly enforce the same rule.
+- [ ] Rest-timer behavior for supersets needs more testing; The basic alternating case looks sensible, but this is stateful behavior that is easy to get subtly wrong when: one exercise has more sets than the other, one exercise is deleted, a superset is unlinked, sets are deleted, a user logs exercises out of sequence.
+- [ ] Date.now makes some logic harder to test deterministically; I'd apply the same philosophy more broadly to date-sensitive report/session logic; It will make edge cases such as:end of month, start of week, DST transition, end date, future date.
+- [ ] Report language says "RPE" even when effort came from RIR.
+- [ ] Some report wording still says "week-1" when it's actually the first session.
+- [ ] BackupError.fileAccessDenied unused.
 - [ ] Plate Calculator option visible for dumbbells/machine exercises, not applicable, should be present only for the main lifts. (PlateCalculator.swift, WorkoutSessionView.swift)
