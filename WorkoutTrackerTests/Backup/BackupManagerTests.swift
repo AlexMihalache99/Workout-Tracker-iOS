@@ -85,7 +85,7 @@ final class BackupManagerTests: XCTestCase {
             decoded.workouts.first?
                 .exercises.first?
                 .sets
-                .first { $0.setType == "working" }
+                .first { $0.setType == .working }
 
         XCTAssertEqual(workingSet?.weight, 140)
         XCTAssertEqual(workingSet?.reps, 3)
@@ -273,7 +273,7 @@ final class BackupManagerTests: XCTestCase {
     func test_importBackup_recoversEntryWhenExerciseMissingFromCatalog() throws {
 
         let backupSet = BackupSet(
-            setType: "working",
+            setType: .working,
             setNumber: 1,
             weight: 50,
             reps: 5,
@@ -376,6 +376,32 @@ final class BackupManagerTests: XCTestCase {
         }
     }
 
+    // MARK: - Versioning / migration
+
+    func test_decode_migratesOlderBackupMissingNewerFields() throws {
+        // Simulates a v1 export: no id, prMetric, supersetGroupID, or session times.
+        let legacyJSON = """
+        {
+          "version": 1,
+          "exportedAt": "2026-01-01T00:00:00Z",
+          "exercises": [{"name": "Deadlift", "category": "Big 3", "isMainLift": true}],
+          "workouts": [{
+            "date": "2026-01-01T00:00:00Z",
+            "exercises": [{"exerciseName": "Deadlift", "sets": [
+              {"setType": "working", "setNumber": 1, "weight": 100, "reps": 5}
+            ]}]
+          }]
+        }
+        """.data(using: .utf8)!
+
+        let backup = try BackupManager.decode(legacyJSON)
+
+        XCTAssertEqual(backup.version, BackupManager.currentVersion)
+        XCTAssertEqual(backup.exercises.first?.prMetric, nil)
+        XCTAssertEqual(backup.workouts.first?.id, nil)
+        XCTAssertEqual(backup.workouts.first?.exercises.first?.sets.first?.setType, .working)
+    }
+
     // MARK: - Replace
 
     func test_importReplace_wipesExistingDataBeforeRestoring() throws {
@@ -412,7 +438,7 @@ final class BackupManagerTests: XCTestCase {
         )
 
         let backupSet = BackupSet(
-            setType: "working",
+            setType: .working,
             setNumber: 1,
             weight: 100,
             reps: 5,
@@ -510,7 +536,7 @@ final class BackupManagerTests: XCTestCase {
         )
 
         let backupSet = BackupSet(
-            setType: "working",
+            setType: .working,
             setNumber: 1,
             weight: 85,
             reps: 5,
@@ -568,7 +594,7 @@ final class BackupManagerTests: XCTestCase {
             1
         )
     }
-    
+
     func test_importReplace_rollsBackAllChangesIfFinalSaveFails() throws {
         let deadlift = TestFixtures.makeExercise(context: context, name: "Deadlift", prMetric: .weight)
         let existingWorkout = TestFixtures.makeWorkout(context: context, date: Date(), name: "Existing Session")
@@ -576,7 +602,7 @@ final class BackupManagerTests: XCTestCase {
         try context.save()
 
         let backupExercise = BackupExercise(name: "Squat", category: "Big 3", isMainLift: true, prMetric: .weight, notes: nil)
-        let backupSet = BackupSet(setType: "working", setNumber: 1, weight: 100, reps: 5, rpe: nil, rir: nil)
+        let backupSet = BackupSet(setType: .working, setNumber: 1, weight: 100, reps: 5, rpe: nil, rir: nil)
         let backupEntry = BackupExerciseEntry(exerciseName: "Squat", sets: [backupSet], supersetGroupID: nil)
         let backupWorkout = BackupWorkout(date: Date(), name: "Restored Session", notes: nil, sessionStartTime: nil, sessionEndTime: nil, exercises: [backupEntry])
         let backup = BackupData(version: BackupManager.currentVersion, exportedAt: .now, exercises: [backupExercise], workouts: [backupWorkout])
@@ -596,7 +622,7 @@ final class BackupManagerTests: XCTestCase {
         try context.save()
 
         let backupExercise = BackupExercise(name: "Squat", category: "Big 3", isMainLift: true, prMetric: .weight, notes: nil)
-        let backupSet = BackupSet(setType: "working", setNumber: 1, weight: 100, reps: 5, rpe: nil, rir: nil)
+        let backupSet = BackupSet(setType: .working, setNumber: 1, weight: 100, reps: 5, rpe: nil, rir: nil)
         let backupEntry = BackupExerciseEntry(exerciseName: "Squat", sets: [backupSet], supersetGroupID: nil)
         let backupWorkout = BackupWorkout(date: Date(), name: "Restored Session", notes: nil, sessionStartTime: nil, sessionEndTime: nil, exercises: [backupEntry])
         let backup = BackupData(version: BackupManager.currentVersion, exportedAt: .now, exercises: [backupExercise], workouts: [backupWorkout])
@@ -610,7 +636,7 @@ final class BackupManagerTests: XCTestCase {
         let allExercises = try context.fetch(FetchDescriptor<Exercise>())
         XCTAssertEqual(allExercises.map { $0.name }, ["Squat"])
     }
-    
+
     func test_importMerge_isIdempotentOnRepeatImport() throws {
         let deadlift = TestFixtures.makeExercise(context: context, name: "Deadlift", prMetric: .weight)
         let workout = TestFixtures.makeWorkout(context: context, date: Date(), name: "Session A")
@@ -651,7 +677,7 @@ final class BackupManagerTests: XCTestCase {
         try context.save()
 
         let backupExercise = BackupExercise(name: "Squat", category: "Big 3", isMainLift: true, prMetric: .weight, notes: nil)
-        let backupSet = BackupSet(setType: "working", setNumber: 1, weight: 100, reps: 5, rpe: nil, rir: nil)
+        let backupSet = BackupSet(setType: .working, setNumber: 1, weight: 100, reps: 5, rpe: nil, rir: nil)
         let backupEntry = BackupExerciseEntry(exerciseName: "Squat", sets: [backupSet], supersetGroupID: nil)
         let backupWorkout = BackupWorkout(id: UUID(), date: Date(), name: "New Session", notes: nil, sessionStartTime: nil, sessionEndTime: nil, exercises: [backupEntry])
         let backup = BackupData(version: BackupManager.currentVersion, exportedAt: .now, exercises: [backupExercise], workouts: [backupWorkout])
@@ -669,7 +695,7 @@ final class BackupManagerTests: XCTestCase {
     func test_importMerge_backupWithoutIDs_stillImportsSuccessfully() throws {
         // Simulates a pre-upgrade backup file with no workout IDs at all.
         let backupExercise = BackupExercise(name: "Deadlift", category: "Big 3", isMainLift: true, prMetric: .weight, notes: nil)
-        let backupSet = BackupSet(setType: "working", setNumber: 1, weight: 140, reps: 3, rpe: nil, rir: nil)
+        let backupSet = BackupSet(setType: .working, setNumber: 1, weight: 140, reps: 3, rpe: nil, rir: nil)
         let backupEntry = BackupExerciseEntry(exerciseName: "Deadlift", sets: [backupSet], supersetGroupID: nil)
         let backupWorkout = BackupWorkout(id: nil, date: Date(), name: "Legacy Session", notes: nil, sessionStartTime: nil, sessionEndTime: nil, exercises: [backupEntry])
         let backup = BackupData(version: BackupManager.currentVersion, exportedAt: .now, exercises: [backupExercise], workouts: [backupWorkout])

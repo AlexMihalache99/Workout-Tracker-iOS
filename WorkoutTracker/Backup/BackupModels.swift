@@ -135,6 +135,29 @@ enum BackupManager {
             workouts: backupWorkouts
         )
     }
+    
+    enum BackupMigrator {
+        /// Upgrades a decoded backup to the current schema. Purely additive
+        /// Optional fields (most of this app's history so far) don't actually
+        /// need explicit migration, since Codable already defaults a missing
+        /// key to nil -- this hook exists for the day a change ISN'T simply
+        /// additive (a renamed field, a changed unit, a re-typed value) and
+        /// needs real transformation before the rest of the app touches it.
+        static func migrate(_ data: BackupData) -> BackupData {
+            var migrated = data
+            // No transformations needed yet: v1 -> v2 only added Optional
+            // fields (prMetric, supersetGroupID, sessionStartTime/EndTime,
+            // notes, workout id), which decode safely as nil on older files.
+            // Add version-gated transformations here as future changes
+            // require them, e.g.:
+            //
+            // if migrated.version < 3 {
+            //     migrated.workouts = migrated.workouts.map { ... }
+            // }
+            migrated.version = BackupManager.currentVersion
+            return migrated
+        }
+    }
 
     static func encode(_ backup: BackupData) throws -> Data {
         let encoder = JSONEncoder()
@@ -149,19 +172,12 @@ enum BackupManager {
 
     static func decode(_ data: Data) throws -> BackupData {
         let decoder = JSONDecoder()
-
         decoder.dateDecodingStrategy = .iso8601
-
-        let backup = try decoder.decode(
-            BackupData.self,
-            from: data
-        )
-
+        let backup = try decoder.decode(BackupData.self, from: data)
         guard backup.version <= currentVersion else {
             throw BackupError.unsupportedVersion(backup.version)
         }
-
-        return backup
+        return BackupMigrator.migrate(backup)
     }
 
     static func importBackup(
