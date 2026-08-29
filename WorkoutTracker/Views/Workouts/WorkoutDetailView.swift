@@ -17,6 +17,11 @@ struct WorkoutDetailView: View {
     @AppStorage("bodyweightKg") private var bodyweightKg: Double = 0
     private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
 
+    @State private var nameText: String = ""
+    @State private var notesText: String = ""
+    @FocusState private var nameFieldFocused: Bool
+    @FocusState private var notesFieldFocused: Bool
+
     private struct SetEditorTarget: Identifiable {
         let id = UUID()
         let entry: ExerciseEntry
@@ -26,13 +31,11 @@ struct WorkoutDetailView: View {
     var body: some View {
         List {
             Section("Name") {
-                TextField("Workout name", text: Binding(
-                    get: { workout.name ?? "" },
-                    set: { workout.name = $0.isEmpty ? nil : $0 }
-                ))
-                .accessibilityIdentifier("workoutDetail.nameField")
+                TextField("Workout name", text: $nameText)
+                    .focused($nameFieldFocused)
+                    .accessibilityIdentifier("workoutDetail.nameField")
             }
-            
+
             Section("Summary") {
                 LabeledContent("Date", value: workout.date.formatted(date: .abbreviated, time: .shortened))
                 if let minutes = workout.durationMinutes {
@@ -44,10 +47,8 @@ struct WorkoutDetailView: View {
             }
 
             Section("Notes") {
-                TextField("Add notes...", text: Binding(
-                    get: { workout.notes ?? "" },
-                    set: { workout.notes = $0.isEmpty ? nil : $0 }
-                ), axis: .vertical)
+                TextField("Add notes...", text: $notesText, axis: .vertical)
+                    .focused($notesFieldFocused)
             }
 
             ForEach(workout.sortedExercises) { entry in
@@ -94,6 +95,27 @@ struct WorkoutDetailView: View {
                 }
             }
         }
+        .onAppear {
+            nameText = workout.name ?? ""
+            notesText = workout.notes ?? ""
+        }
+        .onChange(of: nameFieldFocused) { _, isFocused in
+            if !isFocused {
+                workout.name = nameText.isEmpty ? nil : nameText
+                try? modelContext.save()
+            }
+        }
+        .onChange(of: notesFieldFocused) { _, isFocused in
+            if !isFocused {
+                workout.notes = notesText.isEmpty ? nil : notesText
+                try? modelContext.save()
+            }
+        }
+        .onDisappear {
+            workout.name = nameText.isEmpty ? nil : nameText
+            workout.notes = notesText.isEmpty ? nil : notesText
+            try? modelContext.save()
+        }
         .navigationTitle(workout.name ?? workout.date.formatted(date: .abbreviated, time: .omitted))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $setEditorTarget) { target in
@@ -101,7 +123,9 @@ struct WorkoutDetailView: View {
                 setType: target.set.setType,
                 nextSetNumber: target.set.setNumber,
                 editingSet: target.set,
-                onSave: { _ in },
+                onSave: { _ in
+                    try? modelContext.save()
+                },
                 prMetric: target.entry.exercise?.prMetric
             )
         }
@@ -116,5 +140,6 @@ struct WorkoutDetailView: View {
             modelContext.delete(setToDelete)
             entry.sets.removeAll { $0.persistentModelID == setToDelete.persistentModelID }
         }
+        try? modelContext.save()
     }
 }

@@ -19,6 +19,7 @@ struct ExerciseDetailView: View {
     
     @State private var notesText: String = ""
     @FocusState private var notesFieldFocused: Bool
+    @Environment(\.modelContext) private var modelContext
 
     init(exercise: Exercise) {
         self.exercise = exercise
@@ -85,6 +86,7 @@ struct ExerciseDetailView: View {
                         case .reps: exercise.prMetric = .reps
                         case .assisted: exercise.prMetric = .assisted
                         }
+                        try? modelContext.save()
                     }
                 )) {
                     ForEach(PRTrackingOption.allCases) { option in
@@ -153,13 +155,15 @@ struct ExerciseDetailView: View {
         .onAppear {
             notesText = exercise.notes ?? ""
         }
-        .onChange(of: notesFieldFocused) { _, isFocused in
+        onChange(of: notesFieldFocused) { _, isFocused in
             if !isFocused {
                 exercise.notes = notesText.isEmpty ? nil : notesText
+                try? modelContext.save()
             }
         }
         .onDisappear {
             exercise.notes = notesText.isEmpty ? nil : notesText
+            try? modelContext.save()
         }
     }
 }
