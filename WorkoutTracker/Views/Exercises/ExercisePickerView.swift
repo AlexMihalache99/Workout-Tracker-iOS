@@ -25,7 +25,7 @@ struct ExercisePickerView: View {
     }
 
     private var exactMatchExists: Bool {
-        exercises.contains { $0.name.localizedCaseInsensitiveCompare(searchText) == .orderedSame }
+        exercises.contains { $0.name.localizedCaseInsensitiveCompare(trimmedSearchText) == .orderedSame }
     }
 
     private var trimmedSearchText: String {
