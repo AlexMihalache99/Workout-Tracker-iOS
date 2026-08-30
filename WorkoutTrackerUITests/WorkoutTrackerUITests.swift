@@ -213,4 +213,52 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(systemSheet.waitForExistence(timeout: 5), "Expected the system export sheet to appear")
     }
     
+    func testPRDashboardShowsTrendAfterTwoSessions() throws {
+        let app = launchApp()
+
+        for weight in ["100", "105"] {
+            app.buttons["workoutList.newWorkoutButton"].tap()
+            app.buttons["newWorkout.addExerciseButton"].tap()
+
+            let searchField = app.searchFields.firstMatch
+            XCTAssertTrue(searchField.waitForExistence(timeout: 5))
+            searchField.tap()
+            searchField.typeText("Deadlift")
+
+            let deadliftRow = app.buttons["exercisePicker.row.Deadlift"]
+            XCTAssertTrue(deadliftRow.waitForExistence(timeout: 5))
+            deadliftRow.tap()
+
+            let workingSetButtonPredicate = NSPredicate(format: "identifier BEGINSWITH 'newWorkout.workingSetButton.'")
+            let workingSetButton = app.buttons.matching(workingSetButtonPredicate).firstMatch
+            XCTAssertTrue(workingSetButton.waitForExistence(timeout: 5))
+            workingSetButton.tap()
+
+            app.textFields["setEditor.weightField"].tap()
+            app.textFields["setEditor.weightField"].typeText(weight)
+            app.textFields["setEditor.repsField"].tap()
+            app.textFields["setEditor.repsField"].typeText("5")
+            app.buttons["setEditor.saveButton"].tap()
+
+            let saveWorkoutButton = app.buttons["newWorkout.saveButton"]
+            XCTAssertTrue(saveWorkoutButton.waitForExistence(timeout: 15))
+            saveWorkoutButton.tap()
+        }
+
+        app.tabBars.buttons["PRs"].tap()
+        XCTAssertTrue(app.staticTexts["DEADLIFT"].waitForExistence(timeout: 5))
+    }
+
+    func testGenerateReportShowsSummaryAndInsights() throws {
+        let app = launchApp()
+
+        app.tabBars.buttons["Report"].tap()
+
+        let generateButton = app.buttons["Generate Report"]
+        XCTAssertTrue(generateButton.waitForExistence(timeout: 5))
+        generateButton.tap()
+
+        XCTAssertTrue(app.staticTexts["SUMMARY"].waitForExistence(timeout: 5))
+    }
+    
 }
