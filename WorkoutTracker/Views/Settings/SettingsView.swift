@@ -186,6 +186,7 @@ struct SettingsView: View {
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                             .focused($bodyweightFieldFocused)
+                            .accessibilityIdentifier("settings.bodyweightField")
                         Text(weightUnit.wrappedValue.label)
                             .foregroundStyle(.secondary)
                         
@@ -253,12 +254,14 @@ struct SettingsView: View {
                     } label: {
                         Label("Export Backup", systemImage: "square.and.arrow.up")
                     }
+                    .accessibilityIdentifier("settings.exportButton")
 
                     Button {
                         showingImportPicker = true
                     } label: {
                         Label("Import Backup", systemImage: "square.and.arrow.down")
                     }
+                    .accessibilityIdentifier("settings.importButton")
 
                     Text("Export before updating or reinstalling the app, then import afterward to restore your full workout history.")
                         .font(.caption)
