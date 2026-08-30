@@ -11,9 +11,6 @@ import SwiftUI
 @main
 struct WorkoutTrackerLiveActivityBundle: WidgetBundle {
     var body: some Widget {
-        WorkoutTrackerLiveActivity()
-        WorkoutTrackerLiveActivityControl()
-        WorkoutTrackerLiveActivityLiveActivity()
         RestTimerLiveActivityWidget()
     }
 }
