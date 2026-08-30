@@ -34,7 +34,11 @@ struct ConsistencyStats {
 
 enum ConsistencyCalculator {
     static func build(workouts: [Workout], weeksBack: Int = 20, referenceDate: Date = .now) -> ConsistencyStats {
-        let calendar = Calendar.current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.firstWeekday = 2
+        calendar.minimumDaysInFirstWeek = 4
+        calendar.timeZone = .current
+
         let workoutsByDay = Dictionary(grouping: workouts) { calendar.startOfDay(for: $0.date) }
 
         guard let currentWeekStart = calendar.dateInterval(of: .weekOfYear, for: referenceDate)?.start,
