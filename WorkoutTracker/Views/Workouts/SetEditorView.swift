@@ -71,6 +71,7 @@ struct SetEditorView: View {
                                     .foregroundStyle(AppTheme.accent)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("setEditor.plateCalculatorButton")
                         }
                     }
                     HStack {

@@ -94,6 +94,7 @@ struct ExerciseDetailView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .accessibilityIdentifier("exerciseDetail.prTrackingMenu")
             }
             
             Section("Form Cues & Notes") {

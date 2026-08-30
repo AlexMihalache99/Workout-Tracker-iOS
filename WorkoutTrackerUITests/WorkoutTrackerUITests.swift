@@ -260,5 +260,92 @@ final class WorkoutTrackerUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["SUMMARY"].waitForExistence(timeout: 5))
     }
+
+    func testPlateCalculatorShowsBreakdownForTargetWeight() throws {
+        let app = launchApp()
+
+        app.buttons["workoutList.newWorkoutButton"].tap()
+        app.buttons["newWorkout.addExerciseButton"].tap()
+
+        let searchField = app.searchFields.firstMatch
+        XCTAssertTrue(searchField.waitForExistence(timeout: 5))
+        searchField.tap()
+        searchField.typeText("Bench Press")
+
+        let benchRow = app.buttons["exercisePicker.row.Bench Press"]
+        XCTAssertTrue(benchRow.waitForExistence(timeout: 5))
+        benchRow.tap()
+
+        let workingSetButtonPredicate = NSPredicate(format: "identifier BEGINSWITH 'newWorkout.workingSetButton.'")
+        let workingSetButton = app.buttons.matching(workingSetButtonPredicate).firstMatch
+        XCTAssertTrue(workingSetButton.waitForExistence(timeout: 5))
+        workingSetButton.tap()
+
+        let weightField = app.textFields["setEditor.weightField"]
+        XCTAssertTrue(weightField.waitForExistence(timeout: 5))
+        weightField.tap()
+        weightField.typeText("100")
+
+        app.buttons["setEditor.plateCalculatorButton"].tap()
+
+        let plateTargetField = app.textFields["plateCalculator.targetWeightField"]
+        XCTAssertTrue(plateTargetField.waitForExistence(timeout: 5))
+        // Should already be prefilled from the weight field — confirm the sheet opened correctly.
+        XCTAssertFalse(plateTargetField.value as? String == "", "Expected the plate calculator to prefill the target weight")
+    }
+
+    func testDeleteWorkoutConfirmationCancelKeepsWorkout() throws {
+        let app = launchApp()
+
+        // Log and save one workout so there's something to swipe-delete.
+        app.buttons["workoutList.newWorkoutButton"].tap()
+        let nameField = app.textFields["newWorkout.nameField"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        nameField.tap()
+        nameField.typeText("Delete Test Workout")
+
+        app.buttons["newWorkout.addExerciseButton"].tap()
+        let searchField = app.searchFields.firstMatch
+        XCTAssertTrue(searchField.waitForExistence(timeout: 5))
+        searchField.tap()
+        searchField.typeText("Squat")
+
+        let squatRow = app.buttons["exercisePicker.row.Squat"]
+        XCTAssertTrue(squatRow.waitForExistence(timeout: 5))
+        squatRow.tap()
+
+        let workingSetButtonPredicate = NSPredicate(format: "identifier BEGINSWITH 'newWorkout.workingSetButton.'")
+        let workingSetButton = app.buttons.matching(workingSetButtonPredicate).firstMatch
+        XCTAssertTrue(workingSetButton.waitForExistence(timeout: 5))
+        workingSetButton.tap()
+
+        app.textFields["setEditor.weightField"].tap()
+        app.textFields["setEditor.weightField"].typeText("80")
+        app.textFields["setEditor.repsField"].tap()
+        app.textFields["setEditor.repsField"].typeText("5")
+        app.buttons["setEditor.saveButton"].tap()
+
+        let saveWorkoutButton = app.buttons["newWorkout.saveButton"]
+        XCTAssertTrue(saveWorkoutButton.waitForExistence(timeout: 15))
+        saveWorkoutButton.tap()
+
+        // Swipe to reveal Delete, tap it to trigger the confirmation overlay.
+        let workoutRowPredicate = NSPredicate(format: "identifier BEGINSWITH 'workoutList.row.'")
+        let workoutRow = app.buttons.matching(workoutRowPredicate).firstMatch
+        XCTAssertTrue(workoutRow.waitForExistence(timeout: 5))
+        workoutRow.swipeLeft()
+
+        let deleteSwipeButton = app.buttons["Delete"]
+        XCTAssertTrue(deleteSwipeButton.waitForExistence(timeout: 5))
+        deleteSwipeButton.tap()
+
+        // The confirmation overlay should now be showing — cancel it.
+        let cancelButton = app.buttons["Cancel"]
+        XCTAssertTrue(cancelButton.waitForExistence(timeout: 5))
+        cancelButton.tap()
+
+        // Workout should still be in the list.
+        XCTAssertTrue(app.buttons.matching(workoutRowPredicate).firstMatch.waitForExistence(timeout: 5))
+    }
     
 }

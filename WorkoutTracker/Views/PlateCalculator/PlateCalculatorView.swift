@@ -73,6 +73,7 @@ struct PlateCalculatorView: View {
                             .multilineTextAlignment(.center)
                             .focused($fieldFocused)
                             .frame(width: 160)
+                            .accessibilityIdentifier("plateCalculator.targetWeightField")
                         Text(weightUnit.label)
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(AppTheme.textSecondary)

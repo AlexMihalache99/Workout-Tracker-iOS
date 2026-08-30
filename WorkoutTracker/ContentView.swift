@@ -62,6 +62,7 @@ private struct ExerciseListView: View {
                     }
                 }
                 .listRowBackground(AppTheme.surface)
+                .accessibilityIdentifier("exerciseList.row.\(exercise.name)")
             }
             .scrollContentBackground(.hidden)
             .background(AppTheme.background)
