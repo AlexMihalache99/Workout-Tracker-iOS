@@ -141,14 +141,22 @@ struct WorkoutListView: View {
                         Button {
                             filterExercise = nil
                         } label: {
-                            Label("All Exercises", systemImage: filterExercise == nil ? "checkmark" : "")
+                            if filterExercise == nil {
+                                Label("All Exercises", systemImage: "checkmark")
+                            } else {
+                                Text("All Exercises")
+                            }
                         }
                         Divider()
                         ForEach(filterableExercises) { exercise in
                             Button {
                                 filterExercise = exercise
                             } label: {
-                                Label(exercise.name, systemImage: filterExercise?.name == exercise.name ? "checkmark" : "")
+                                if filterExercise?.name == exercise.name {
+                                    Label(exercise.name, systemImage: "checkmark")
+                                } else {
+                                    Text(exercise.name)
+                                }
                             }
                         }
                     } label: {
