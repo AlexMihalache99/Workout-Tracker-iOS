@@ -156,7 +156,7 @@ struct ExerciseDetailView: View {
         .onAppear {
             notesText = exercise.notes ?? ""
         }
-        onChange(of: notesFieldFocused) { _, isFocused in
+        .onChange(of: notesFieldFocused) { _, isFocused in
             if !isFocused {
                 exercise.notes = notesText.isEmpty ? nil : notesText
                 try? modelContext.save()
