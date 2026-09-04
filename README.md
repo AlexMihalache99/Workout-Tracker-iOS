@@ -157,3 +157,20 @@ Since the app has no cloud sync and all data lives only in local SwiftData stora
 Typical update flow: **Export Backup** before updating or reinstalling → **Import Backup → Replace All Data** afterward to restore everything.
 ## Notes
 Weights are stored in kilograms internally. The selected display unit only changes how values are entered and presented, so switching between kg and lb does not rewrite past workout data.
+
+## Future Upgrades
+
+Ideas and improvements I'm considering based on real usage, not yet scheduled:
+
+- **AI-generated report summaries** — use an LLM (e.g. via the Claude API/SDK) to generate a natural-language training summary or critique on the Report tab — tailored to either a strength-training or bodybuilding-style analysis — instead of just raw stats.
+- **Display large training volumes in tonnes** — once total volume passes 10,000 kg, show it in tonnes (T) instead of kg for readability (e.g. 202,199 kg → 202.2T), on the Report tab and anywhere else cumulative volume is shown.
+- **Configurable plate-calculator eligibility** — the plate calculator and warm-up suggester currently only activate for a hardcoded list of exercises (Deadlift, Bench Press, Squat, Overhead Press). Make this a per-exercise setting instead, so any barbell lift the user adds can opt in.
+- **iCloud sync between devices** — now that export/import backup (merge vs. replace) is solid and well-tested, a natural next step is automatic CloudKit sync instead of manual backup files.
+- **Export reports as PDF/CSV** — let a generated report be shared or archived outside the app, not just viewed in-app.
+- **Apple Watch companion** — log sets mid-workout without reaching for the phone.
+- **PR-to-bodyweight ratio should reflect bodyweight at the time of the lift, not the current value** — the ratio shown on the PR Dashboard and in Reports currently recomputes every existing PR against today's Settings → Bodyweight value, so gaining or losing weight retroactively changes the ratio on lifts from months ago (e.g. 100kg at 90kg bodyweight shows 1.11x today, but if bodyweight later changes to 95kg, that same historical 100kg PR silently redisplays as 1.05x). The fix needs bodyweight to become a timestamped log rather than a single stored value, with each session snapshotting the bodyweight at the time it was logged — so a PR's ratio is fixed at the moment it happened and never moves again just because today's number changed.
+- **Bodyweight history/log** — a simple timestamped log of bodyweight entries (manual or pulled from Health) rather than a single current value, so you can see your own weight trend over time, not just your lifts'.
+- **Muscle-group tagging on exercises** — `Exercise.category` currently distinguishes "Big 3" vs. "Accessory" but nothing tracks push/pull/legs or specific muscle groups, so Bodybuilding-focus reports can't break volume down by muscle group, only by exercise or overall total.
+- **Multiple bar types** — bar weight is a single global Settings value, which doesn't account for a trap bar, safety-squat bar, or women's bar all having different weights; the plate calculator and warm-up suggester would need to know which bar a given exercise uses.
+- **Light appearance option** — the app currently forces dark mode (`.preferredColorScheme(.dark)`) as a deliberate design choice for the plate-color theme; worth revisiting if it's ever genuinely wanted, though the current palette was built specifically around a dark background.
+- **In-app data validation / integrity check** — a "Check my data" utility in Settings that scans for known-messy states (e.g. a workout with zero exercises left after deletions, a set with implausible weight/rep combinations) and surfaces them, rather than relying on the model-level clamping alone to keep things sane.
