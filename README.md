@@ -162,7 +162,7 @@ Weights are stored in kilograms internally. The selected display unit only chang
 
 Ideas and improvements I'm considering based on real usage, not yet scheduled:
 
-- **AI-generated report summaries** — use an LLM (e.g. via the Claude API/SDK) to generate a natural-language training summary or critique on the Report tab — tailored to either a strength-training or bodybuilding-style analysis — instead of just raw stats.
+- **AI-generated report summaries** — improved the generated report by taking into account workout notes, week 10 of strength training blocks being 1RMax week testing, so a drop in volume it's normal, text structure should be cleaner. 
 - **Display large training volumes in tonnes** — once total volume passes 10,000 kg, show it in tonnes (T) instead of kg for readability (e.g. 202,199 kg → 202.2T), on the Report tab and anywhere else cumulative volume is shown.
 - **Configurable plate-calculator eligibility** — the plate calculator and warm-up suggester currently only activate for a hardcoded list of exercises (Deadlift, Bench Press, Squat, Overhead Press). Make this a per-exercise setting instead, so any barbell lift the user adds can opt in.
 - **iCloud sync between devices** — now that export/import backup (merge vs. replace) is solid and well-tested, a natural next step is automatic CloudKit sync instead of manual backup files.
