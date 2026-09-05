@@ -19,6 +19,35 @@ struct ReportView: View {
     @State private var endDate: Date = .now
     @State private var phase: TrainingPhase = .strength
     @State private var report: WorkoutReport?
+    
+    @State private var aiSummary: String?
+    @State private var isGeneratingSummary = false
+    @State private var summaryErrorMessage: String?
+    
+    private func generateAISummary(for report: WorkoutReport) {
+        guard let apiKey = KeychainHelper.load(), !apiKey.isEmpty else {
+            summaryErrorMessage = "Add your Claude API key in Settings first."
+            return
+        }
+        isGeneratingSummary = true
+        aiSummary = nil
+        Task {
+            do {
+                let summary = try await ClaudeSummaryService.generateSummary(
+                    report: report, phase: phase, weightUnit: weightUnit, apiKey: apiKey
+                )
+                await MainActor.run {
+                    aiSummary = summary
+                    isGeneratingSummary = false
+                }
+            } catch {
+                await MainActor.run {
+                    summaryErrorMessage = error.localizedDescription
+                    isGeneratingSummary = false
+                }
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -66,12 +95,49 @@ struct ReportView: View {
 
                     if let report {
                         ReportResultsView(report: report, weightUnit: weightUnit)
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("AI SUMMARY").font(.system(size: 12, weight: .bold)).tracking(1.2).foregroundStyle(AppTheme.textSecondary)
+
+                            if let aiSummary {
+                                Text(aiSummary)
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(AppTheme.textPrimary)
+                            }
+
+                            Button {
+                                generateAISummary(for: report)
+                            } label: {
+                                if isGeneratingSummary {
+                                    HStack(spacing: 8) {
+                                        ProgressView()
+                                        Text("Generating...")
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                } else {
+                                    Text(aiSummary == nil ? "Generate AI Summary" : "Regenerate AI Summary")
+                                        .frame(maxWidth: .infinity)
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(isGeneratingSummary)
+                        }
+                        .cardStyle()
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .padding(16)
             }
             .background(AppTheme.background)
             .navigationTitle("Report")
+            .alert("Summary Failed", isPresented: Binding(
+                get: { summaryErrorMessage != nil },
+                set: { if !$0 { summaryErrorMessage = nil } }
+            )) {
+                Button("OK") { summaryErrorMessage = nil }
+            } message: {
+                Text(summaryErrorMessage ?? "")
+            }
         }
     }
 }

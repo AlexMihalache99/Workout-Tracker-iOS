@@ -58,6 +58,10 @@ struct SettingsView: View {
     @State private var isSyncingBodyweight = false
     @State private var healthSyncMessage: String?
     
+    //ClaudeSDK
+    @State private var claudeAPIKeyText: String = ""
+    @FocusState private var apiKeyFieldFocused: Bool
+    
     private var bodyweightBinding: Binding<Double> {
         Binding<Double>(
             get: {
@@ -232,6 +236,26 @@ struct SettingsView: View {
                     }
                 }
                 
+                Section("AI Report Summaries") {
+                    SecureField("Claude API Key", text: $claudeAPIKeyText)
+                        .focused($apiKeyFieldFocused)
+                    Text("Stored in the device Keychain, not in this app's regular settings or backups. When you tap \"Generate AI Summary\" on the Report tab, the report's stats for that period are sent to Anthropic's API to write the summary text.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .onAppear {
+                    claudeAPIKeyText = KeychainHelper.load() ?? ""
+                }
+                .onChange(of: apiKeyFieldFocused) { _, isFocused in
+                    if !isFocused {
+                        if claudeAPIKeyText.isEmpty {
+                            KeychainHelper.delete()
+                        } else {
+                            KeychainHelper.save(claudeAPIKeyText)
+                        }
+                    }
+                }
+                
                 Section("Rest Timer") {
                     Stepper(value: $restTimerDuration, in: 30...300, step: 15) {
                         HStack {
@@ -276,6 +300,7 @@ struct SettingsView: View {
                     Button("Done") {
                         bodyweightFieldFocused = false
                         barWeightFieldFocused = false
+                        apiKeyFieldFocused = false
                     }
                 }
             }
