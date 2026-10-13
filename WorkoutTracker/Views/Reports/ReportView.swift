@@ -19,35 +19,10 @@ struct ReportView: View {
     @State private var endDate: Date = .now
     @State private var phase: TrainingPhase = .strength
     @State private var report: WorkoutReport?
-    
-    @State private var aiSummary: String?
+
+    @State private var aiSummary: AISummaryResult?
     @State private var isGeneratingSummary = false
     @State private var summaryErrorMessage: String?
-    
-    private func generateAISummary(for report: WorkoutReport) {
-        guard let apiKey = KeychainHelper.load(), !apiKey.isEmpty else {
-            summaryErrorMessage = "Add your Claude API key in Settings first."
-            return
-        }
-        isGeneratingSummary = true
-        aiSummary = nil
-        Task {
-            do {
-                let summary = try await ClaudeSummaryService.generateSummary(
-                    report: report, phase: phase, weightUnit: weightUnit, apiKey: apiKey
-                )
-                await MainActor.run {
-                    aiSummary = summary
-                    isGeneratingSummary = false
-                }
-            } catch {
-                await MainActor.run {
-                    summaryErrorMessage = error.localizedDescription
-                    isGeneratingSummary = false
-                }
-            }
-        }
-    }
 
     var body: some View {
         NavigationStack {
@@ -74,6 +49,7 @@ struct ReportView: View {
                         .pickerStyle(.segmented)
 
                         Button {
+                            aiSummary = nil   // a summary of the previous report would be stale
                             report = ReportGenerator.generate(
                                 workouts: allWorkouts,
                                 allExercises: allExercises,
@@ -95,35 +71,7 @@ struct ReportView: View {
 
                     if let report {
                         ReportResultsView(report: report, weightUnit: weightUnit)
-
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("AI SUMMARY").font(.system(size: 12, weight: .bold)).tracking(1.2).foregroundStyle(AppTheme.textSecondary)
-
-                            if let aiSummary {
-                                Text(aiSummary)
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(AppTheme.textPrimary)
-                            }
-
-                            Button {
-                                generateAISummary(for: report)
-                            } label: {
-                                if isGeneratingSummary {
-                                    HStack(spacing: 8) {
-                                        ProgressView()
-                                        Text("Generating...")
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                } else {
-                                    Text(aiSummary == nil ? "Generate AI Summary" : "Regenerate AI Summary")
-                                        .frame(maxWidth: .infinity)
-                                }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(isGeneratingSummary)
-                        }
-                        .cardStyle()
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        aiSummaryCard(for: report)
                     }
                 }
                 .padding(16)
@@ -137,6 +85,118 @@ struct ReportView: View {
                 Button("OK") { summaryErrorMessage = nil }
             } message: {
                 Text(summaryErrorMessage ?? "")
+            }
+        }
+    }
+
+    private func aiSummaryCard(for report: WorkoutReport) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("AI SUMMARY")
+                .font(.system(size: 12, weight: .bold)).tracking(1.2)
+                .foregroundStyle(AppTheme.textSecondary)
+
+            if let aiSummary {
+                AISummaryContent(result: aiSummary)
+            }
+
+            Button {
+                generateAISummary(for: report)
+            } label: {
+                if isGeneratingSummary {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Generating...")
+                    }
+                    .frame(maxWidth: .infinity)
+                } else {
+                    Text(aiSummary == nil ? "Generate AI Summary" : "Regenerate AI Summary")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(isGeneratingSummary)
+        }
+        .cardStyle()
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func generateAISummary(for report: WorkoutReport) {
+        guard let apiKey = KeychainHelper.load(), !apiKey.isEmpty else {
+            summaryErrorMessage = "Add your Claude API key in Settings first."
+            return
+        }
+        isGeneratingSummary = true
+
+        // Gather everything as plain values here, so no SwiftData objects cross into the Task.
+        let block = TrainingBlockContext.load()
+        let notes = ClaudeSummaryService.collectNotes(
+            workouts: allWorkouts, start: report.startDate, end: report.endDate
+        )
+        let unit = weightUnit
+
+        Task {
+            do {
+                let result = try await ClaudeSummaryService.generateSummary(
+                    report: report, phase: report.phase, weightUnit: unit,
+                    block: block, notes: notes, apiKey: apiKey
+                )
+                await MainActor.run {
+                    aiSummary = result
+                    isGeneratingSummary = false
+                }
+            } catch {
+                await MainActor.run {
+                    summaryErrorMessage = error.localizedDescription
+                    isGeneratingSummary = false
+                }
+            }
+        }
+    }
+}
+
+private struct AISummaryContent: View {
+    let result: AISummaryResult
+
+    var body: some View {
+        if let summary = result.summary {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(summary.headline)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(AppTheme.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                bulletSection("WENT WELL", icon: "checkmark.circle.fill", tint: .green, items: summary.wins)
+                bulletSection("WATCH OUT", icon: "exclamationmark.triangle.fill", tint: PlateColor.squat, items: summary.watchouts)
+                bulletSection("NEXT BLOCK", icon: "arrow.right.circle.fill", tint: AppTheme.accent, items: summary.nextBlock)
+            }
+        } else {
+            // The model replied with something that wasn't valid JSON: show it as-is.
+            Text(result.rawText)
+                .font(.system(size: 14))
+                .foregroundStyle(AppTheme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private func bulletSection(_ title: String, icon: String, tint: Color, items: [String]) -> some View {
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title)
+                    .font(.system(size: 11, weight: .bold)).tracking(1.2)
+                    .foregroundStyle(AppTheme.textSecondary)
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: icon)
+                            .font(.caption)
+                            .foregroundStyle(tint)
+                            .padding(.top, 3)
+                        Text(item)
+                            .font(.system(size: 14))
+                            .foregroundStyle(AppTheme.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
         }
     }

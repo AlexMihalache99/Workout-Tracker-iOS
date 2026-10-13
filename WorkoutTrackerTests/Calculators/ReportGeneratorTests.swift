@@ -401,4 +401,20 @@ final class ReportGeneratorTests: XCTestCase {
 
         XCTAssertEqual(report.totalWorkouts, 1)
     }
+    
+    func test_weightTrackedExerciseLoggedAtZeroKg_isFlaggedBodyweightOnly() {
+        let dip = Exercise(name: "Weighted Dip", category: "Accessory", isMainLift: false, prMetric: .weight)
+        let workout = makeWorkout(date: daysAgo(1), exercises: [makeEntry(exercise: dip, sets: [makeSet(.working, 0, 8)])])
+
+        let report = ReportGenerator.generate(
+            workouts: [workout], allExercises: [dip],
+            start: daysAgo(7), end: daysAgo(0), phase: .strength, bodyweightKg: 90
+        )
+
+        let lift = report.liftProgress.first { $0.exerciseName == "Weighted Dip" }
+        XCTAssertEqual(lift?.bodyweightOnly, true)
+        XCTAssertNil(lift?.estimatedOneRepMax)
+        XCTAssertNil(lift?.bodyweightRatio)
+        XCTAssertFalse(report.insights.contains { $0.contains("estimated 1RM") && $0.contains("Weighted Dip") })
+    }
 }

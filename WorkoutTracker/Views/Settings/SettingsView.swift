@@ -29,6 +29,19 @@ struct SettingsView: View {
     @AppStorage("plateInventory2_5") private var plateInventory2_5: Int = 4
     @AppStorage("plateInventory1_25") private var plateInventory1_25: Int = 4
     
+    @AppStorage(TrainingBlockContext.Keys.enabled) private var blockContextEnabled = false
+    @AppStorage(TrainingBlockContext.Keys.startTimestamp) private var blockStartTimestamp: Double = 0
+    @AppStorage(TrainingBlockContext.Keys.lengthWeeks) private var blockLengthWeeks: Int = 10
+    @AppStorage(TrainingBlockContext.Keys.testingWeek) private var blockTestingWeek: Int = 10
+    @AppStorage(TrainingBlockContext.Keys.notes) private var blockNotes: String = ""
+
+    private var blockStartDateBinding: Binding<Date> {
+        Binding<Date>(
+            get: { blockStartTimestamp > 0 ? Date(timeIntervalSince1970: blockStartTimestamp) : Date() },
+            set: { blockStartTimestamp = $0.timeIntervalSince1970 }
+        )
+    }
+    
 
     private var weightUnit: Binding<WeightUnit> {
         Binding(
@@ -239,7 +252,7 @@ struct SettingsView: View {
                 Section("AI Report Summaries") {
                     SecureField("Claude API Key", text: $claudeAPIKeyText)
                         .focused($apiKeyFieldFocused)
-                    Text("Stored in the device Keychain, not in this app's regular settings or backups. When you tap \"Generate AI Summary\" on the Report tab, the report's stats for that period are sent to Anthropic's API to write the summary text.")
+                    Text("Stored in the device Keychain, not in this app's regular settings or backups. When you tap \"Generate AI Summary\" on the Report tab, the report’s stats, plus any notes you wrote on workouts in that period, are sent to Anthropic’s API to write the summary.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -254,6 +267,29 @@ struct SettingsView: View {
                             KeychainHelper.save(claudeAPIKeyText)
                         }
                     }
+                }
+                
+                Section("Training Block (for AI summaries)") {
+                    Toggle("Tell the AI about my training block", isOn: $blockContextEnabled)
+                    if blockContextEnabled {
+                        DatePicker("Block start", selection: blockStartDateBinding, in: ...Date.now, displayedComponents: .date)
+                        Stepper("Block length: \(blockLengthWeeks) weeks", value: $blockLengthWeeks, in: 2...20)
+                        Stepper(
+                            blockTestingWeek == 0 ? "1RM testing week: none" : "1RM testing week: week \(blockTestingWeek)",
+                            value: $blockTestingWeek, in: 0...blockLengthWeeks
+                        )
+                        TextField("Anything else (e.g. week 5 is a deload)", text: $blockNotes, axis: .vertical)
+                            .lineLimit(2...5)
+                    }
+                    Text("Blocks are assumed to repeat back-to-back from the start date. Planned patterns like a testing week are marked in the data sent to the AI, so a volume drop there isn't read as a problem.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .onChange(of: blockContextEnabled) { _, isOn in
+                    if isOn && blockStartTimestamp == 0 { blockStartTimestamp = Date().timeIntervalSince1970 }
+                }
+                .onChange(of: blockLengthWeeks) { _, length in
+                    if blockTestingWeek > length { blockTestingWeek = length }
                 }
                 
                 Section("Rest Timer") {

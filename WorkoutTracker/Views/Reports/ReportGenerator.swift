@@ -33,6 +33,7 @@ struct LiftProgress: Identifiable {
     var estimatedOneRepMaxSourceWeight: Double?     // which set produced the 1RM estimate — may differ from bestWeight
     var estimatedOneRepMaxSourceReps: Int?
     var bodyweightRatio: Double?
+    var bodyweightOnly: Bool = false
 
     // .reps (bodyweight sets only)
     var earliestReps: Int?
@@ -145,6 +146,14 @@ enum ReportGenerator {
                     progress.bodyweightRatio = best / bodyweightKg
                 }
                 progress.deloadSignal = detectDeloadSignal(entries: entries, calendar: calendar)
+                
+                if (progress.bestWeight ?? 0) <= 0 {
+                    progress.bodyweightOnly = true
+                    progress.estimatedOneRepMax = nil
+                    progress.estimatedOneRepMaxSourceWeight = nil
+                    progress.estimatedOneRepMaxSourceReps = nil
+                    progress.bodyweightRatio = nil
+                }
 
             case .reps:
                 let bodyweightSessions: [(date: Date, reps: Int)] = entries.compactMap { entry in
@@ -275,27 +284,32 @@ enum ReportGenerator {
         for lift in liftProgress {
             switch lift.metric {
             case .weight:
-                if phase == .strength {
-                    if let delta = lift.weightDelta {
-                        if delta > 0 {
-                            insights.append("\(lift.exerciseName) went from your starting-period top set up to a period-best \(String(format: "%.1f", lift.bestWeight ?? 0)) kg — a \(String(format: "%.1f", delta)) kg improvement.")
-                        } else if delta < 0 {
-                            insights.append("\(lift.exerciseName) period-best top set (\(String(format: "%.1f", lift.bestWeight ?? 0)) kg) came in \(String(format: "%.1f", abs(delta))) kg below your starting-period top set — worth a look.")
-                        } else {
-                            insights.append("\(lift.exerciseName) top set held steady across the period.")
+                if lift.bodyweightOnly {
+                       insights.append("\(lift.exerciseName) was only logged at 0 kg external load, so there's no weight progress to report. Switch it to Reps tracking to follow progress.")
+                } else {
+                    if phase == .strength {
+                        if let delta = lift.weightDelta {
+                            if delta > 0 {
+                                insights.append("\(lift.exerciseName) went from your starting-period top set up to a period-best \(String(format: "%.1f", lift.bestWeight ?? 0)) kg — a \(String(format: "%.1f", delta)) kg improvement.")
+                            } else if delta < 0 {
+                                insights.append("\(lift.exerciseName) period-best top set (\(String(format: "%.1f", lift.bestWeight ?? 0)) kg) came in \(String(format: "%.1f", abs(delta))) kg below your starting-period top set — worth a look.")
+                            } else {
+                                insights.append("\(lift.exerciseName) top set held steady across the period.")
+                            }
                         }
-                    }
-                    if let oneRM = lift.estimatedOneRepMax {
-                        if let srcWeight = lift.estimatedOneRepMaxSourceWeight, let srcReps = lift.estimatedOneRepMaxSourceReps {
-                            insights.append("\(lift.exerciseName) estimated 1RM (Epley): \(String(format: "%.1f", oneRM)) kg, based on \(String(format: "%.1f", srcWeight)) kg × \(srcReps).")
-                        } else {
-                            insights.append("\(lift.exerciseName) estimated 1RM (Epley): \(String(format: "%.1f", oneRM)) kg.")
+                        if let oneRM = lift.estimatedOneRepMax {
+                            if let srcWeight = lift.estimatedOneRepMaxSourceWeight, let srcReps = lift.estimatedOneRepMaxSourceReps {
+                                insights.append("\(lift.exerciseName) estimated 1RM (Epley): \(String(format: "%.1f", oneRM)) kg, based on \(String(format: "%.1f", srcWeight)) kg × \(srcReps).")
+                            } else {
+                                insights.append("\(lift.exerciseName) estimated 1RM (Epley): \(String(format: "%.1f", oneRM)) kg.")
+                            }
                         }
-                    }
-                    if let ratio = lift.bodyweightRatio {
-                        insights.append("\(lift.exerciseName) is now \(String(format: "%.2f", ratio))x your bodyweight.")
+                        if let ratio = lift.bodyweightRatio {
+                            insights.append("\(lift.exerciseName) is now \(String(format: "%.2f", ratio))x your bodyweight.")
+                        }
                     }
                 }
+                
                 if lift.deloadSignal {
                     insights.append("⚠️ \(lift.exerciseName): effort has risen for 3 straight weeks without a matching weight increase — a deload may help.")
                 }
